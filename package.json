@@ -1,0 +1,17 @@
+{
+  "name": "mory",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Local-first memory layer for AI.",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @mory/web dev",
+    "build": "pnpm --filter @mory/memory-core build && pnpm --filter @mory/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  },
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
