@@ -4,7 +4,6 @@ import {
   Archive,
   ArrowDownToLine,
   ArrowUpToLine,
-  Brain,
   Cable,
   Check,
   ChevronDown,
@@ -78,7 +77,7 @@ export function App() {
       <header className="product-header">
         <div className="brand-lockup">
           <div className="brand-glyph">
-            <Brain size={22} />
+            <Archive size={22} />
           </div>
           <div>
             <strong>Mory</strong>
@@ -92,31 +91,68 @@ export function App() {
       </header>
 
       <section className="workspace-layout">
+        <aside className="workspace-nav" aria-label="Record type navigation">
+          <div className="nav-brand-card">
+            <div className="brand-glyph">
+              <Archive size={21} />
+            </div>
+            <div>
+              <strong>Mory</strong>
+              <span>Storehouse</span>
+            </div>
+          </div>
+          <div className="nav-section-label">Record types</div>
+          <div className="record-nav-list">
+            {recordModes.map((mode) => {
+              const count = store.memories.filter((memory) => (memory.kind ?? "note") === mode.kind).length;
+              return (
+                <button key={mode.kind} type="button" onClick={() => setQuery(mode.kind === "note" ? "" : mode.kind)}>
+                  {recordIcon(mode.kind)}
+                  <span>{mode.label}</span>
+                  <strong>{count}</strong>
+                </button>
+              );
+            })}
+          </div>
+          <div className="nav-section-label">Shortcuts</div>
+          <div className="shortcut-list">
+            <button type="button" onClick={() => setQuery("private")}>Private</button>
+            <button type="button" onClick={() => setQuery("waiting")}>Waiting</button>
+            <button type="button" onClick={() => setQuery("bookmark")}>Bookmarks</button>
+          </div>
+        </aside>
         <div className="workspace-main">
           <section className="console-main">
-          <section className="hero-copy">
-            <span className="eyebrow">
-              <Archive size={16} />
-              Personal memory operating system
-            </span>
-            <h1>Capture, organize, and retrieve everything worth keeping.</h1>
-            <p>A local-first repository for notes, chats, bills, tasks, waiting items, bookmarks, files, decisions, and logs.</p>
-          </section>
+            <section className="workbench-intro">
+              <div>
+                <span className="eyebrow">
+                  <Archive size={15} />
+                  Today
+                </span>
+                <h1>Store what matters.</h1>
+              </div>
+              <div className="today-strip" aria-label="Repository summary">
+                <Metric label="Saved" value={stats.total} />
+                <Metric label="Today" value={stats.today} />
+                <Metric label="Topics" value={stats.tags.length} />
+              </div>
+            </section>
 
-          <CaptureConsole />
+            <div className="command-bar">
+              <label className="search-input">
+                <Search size={18} />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search memories, tags, links, bills, tasks..." />
+              </label>
+              <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sources} />
+            </div>
 
-          <div className="search-row">
-            <label className="search-input">
-              <Search size={18} />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Recall by project, tag, source, phrase, or hash" />
-            </label>
-            <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sources} />
-          </div>
-          <AdvancedFilters />
+            <CaptureConsole />
 
-          {error ? <Notice tone="bad" text={error} /> : null}
-          {syncMessage ? <Notice tone="good" text={syncMessage} /> : null}
-          <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
+            <AdvancedFilters />
+
+            {error ? <Notice tone="bad" text={error} /> : null}
+            {syncMessage ? <Notice tone="good" text={syncMessage} /> : null}
+            <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
           </section>
 
           <section className="feed-section">
