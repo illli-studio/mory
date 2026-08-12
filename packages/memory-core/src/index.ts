@@ -1,4 +1,16 @@
-export type MemoryType = "raw" | "summary" | "embedding" | "snapshot" | "relation";
+export type MemoryType = "raw" | "preview" | "snapshot" | "relation";
+export type MemoryKind =
+  | "note"
+  | "chat"
+  | "bill"
+  | "finance"
+  | "task"
+  | "waiting"
+  | "bookmark"
+  | "file"
+  | "decision"
+  | "log";
+export type MemoryFields = Record<string, string | number | boolean | undefined>;
 
 export type MemorySource =
   | "manual"
@@ -21,8 +33,14 @@ export interface MemoryObject {
   capturedAt: string;
   contentHash: string;
   payload: MemoryPayload;
+  kind?: MemoryKind;
+  fields?: MemoryFields;
   tags: string[];
   score: number;
+  preview?: string;
+  /** @deprecated Use preview. Kept only for older local exports. */
+  summary?: string;
+  isPrivate?: boolean;
   parentIds?: string[];
   schemaVersion: number;
 }
@@ -32,9 +50,12 @@ export interface CreateMemoryInput {
   content: string;
   source?: MemorySource;
   type?: MemoryType;
+  kind?: MemoryKind;
+  fields?: MemoryFields;
   url?: string;
   tags?: string[];
   capturedAt?: string;
+  isPrivate?: boolean;
 }
 
 export interface MemoryStats {
@@ -82,14 +103,43 @@ export function suggestTags(text: string): string[] {
     .map(([word]) => word);
 }
 
+export function extractUrls(text: string): string[] {
+  return Array.from(new Set(text.match(/https?:\/\/[^\s<>"')]+/gi) ?? []));
+}
+
+export function createPreview(text: string, maxLength = 180): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  const sentence = normalized.match(/^.{40,}?[.!?]/u)?.[0];
+  const preview = sentence && sentence.length <= maxLength ? sentence : normalized.slice(0, maxLength - 3);
+  return `${preview.trim()}...`;
+}
+
+export const summarizeText = createPreview;
+
+export function domainTag(url: string): string | undefined {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").split(".").slice(0, -1).join("-") || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function createMemory(input: CreateMemoryInput): Promise<MemoryObject> {
   const capturedAt = input.capturedAt ?? new Date().toISOString();
   const source = input.source ?? "manual";
   const type = input.type ?? "raw";
+  const kind = input.kind ?? inferKind(input);
   const title = input.title.trim() || input.content.trim().slice(0, 72) || "Untitled memory";
   const content = input.content.trim();
-  const contentHash = await sha256(JSON.stringify({ source, title, content, url: input.url ?? "" }));
-  const suggestedTags = suggestTags(`${title} ${content}`);
+  const detectedUrl = input.url?.trim() || extractUrls(`${title} ${content}`)[0];
+  const fields = cleanFields(input.fields ?? {});
+  const contentHash = await sha256(JSON.stringify({ source, kind, title, content, url: detectedUrl ?? "", fields }));
+  const urlTag = detectedUrl ? domainTag(detectedUrl) : undefined;
+  const autoTags = suggestTags(`${title} ${content} ${Object.values(fields).join(" ")}`);
 
   return {
     id: crypto.randomUUID(),
@@ -100,10 +150,14 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryObje
     payload: {
       title,
       content,
-      url: input.url?.trim() || undefined,
+      url: detectedUrl || undefined,
     },
-    tags: normalizeTags([...(input.tags ?? []), ...suggestedTags]),
+    kind,
+    fields,
+    tags: normalizeTags([kind, ...(input.tags ?? []), source === "browser" ? "browser" : "", urlTag ?? "", ...autoTags]),
     score: Math.min(100, Math.max(1, Math.round(content.length / 12) + 20)),
+    preview: createPreview(content),
+    isPrivate: input.isPrivate ?? false,
     schemaVersion: 1,
   };
 }
@@ -118,6 +172,11 @@ export function matchesMemory(memory: MemoryObject, query: string): boolean {
     memory.payload.title,
     memory.payload.content,
     memory.payload.url ?? "",
+    memory.kind ?? "",
+    ...Object.values(memory.fields ?? {}).map(String),
+    memory.preview ?? "",
+    memory.summary ?? "",
+    memory.isPrivate ? "private" : "",
     memory.source,
     memory.type,
     ...memory.tags,
@@ -129,6 +188,18 @@ export function matchesMemory(memory: MemoryObject, query: string): boolean {
     .split(/\s+/)
     .filter(Boolean)
     .every((term) => haystack.includes(term));
+}
+
+function inferKind(input: CreateMemoryInput): MemoryKind {
+  if (input.url || extractUrls(`${input.title} ${input.content}`)[0]) {
+    return "bookmark";
+  }
+
+  return input.source === "chat" ? "chat" : "note";
+}
+
+function cleanFields(fields: MemoryFields): MemoryFields {
+  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined && `${value}`.trim() !== ""));
 }
 
 export function computeStats(memories: MemoryObject[], now = new Date()): MemoryStats {
@@ -171,8 +242,7 @@ function emptySourceCounts(): Record<MemorySource, number> {
 function emptyTypeCounts(): Record<MemoryType, number> {
   return {
     raw: 0,
-    summary: 0,
-    embedding: 0,
+    preview: 0,
     snapshot: 0,
     relation: 0,
   };

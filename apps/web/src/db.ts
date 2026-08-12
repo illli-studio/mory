@@ -30,6 +30,14 @@ export async function upsertMemories(memories: MemoryObject[]): Promise<void> {
   await db.memories.bulkPut(memories);
 }
 
+export async function updateMemory(memory: MemoryObject): Promise<void> {
+  await db.memories.put(memory);
+}
+
+export async function deleteMemory(id: string): Promise<void> {
+  await db.memories.delete(id);
+}
+
 export async function clearMemories(): Promise<void> {
   await db.memories.clear();
 }

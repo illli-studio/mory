@@ -2,7 +2,7 @@
   "name": "mory",
   "private": true,
   "version": "0.0.1",
-  "description": "Local-first memory layer for AI.",
+  "description": "Local-first personal memory repository.",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @mory/web dev",
