@@ -1,89 +1,307 @@
+<div align="center">
+
 # Mory
 
-Your personal memory operating system.
+### Your Personal Memory Operating System.
 
-Mory is a local-first memory layer for AI. It captures personal memory objects, keeps raw history immutable, and prepares your context for search, sync, connectors, and future AI retrieval.
+*A local-first memory engine that helps AI truly understand you.*
 
-## Why Mory
+<p>
 
-Every AI conversation starts from zero.
+<img src="https://img.shields.io/badge/Local--First-✓-2ea44f" />
+<img src="https://img.shields.io/badge/Open%20Source-MIT-blue" />
+<img src="https://img.shields.io/badge/AI%20Native-Memory-purple" />
+<img src="https://img.shields.io/badge/Status-Early%20Development-orange" />
 
-Mory explores a different path: your memory belongs to you, lives locally first, and can be reused by any AI system when you need context.
+</p>
 
-## Current MVP
+</div>
 
-The browser MVP can:
+---
 
-- Capture immutable memory objects from manual input
-- Generate stable content hashes for deduplication
-- Store memories locally in IndexedDB
-- Search by title, content, tags, source, and type
-- Track basic repository health and tag stats
-- Sync a JSON memory repository through GitHub
+> We don't need smarter AI.
+>
+> We need AI that remembers.
 
-## Current MVP Stack
+---
 
-- Vite, React, TypeScript
-- Dexie / IndexedDB for local-first storage
-- Zustand for UI state
-- `@mory/memory-core` for memory primitives
+## Why Mory?
 
-This is only the browser MVP layer. The complete architecture is documented in [ARCHITECTURE.md](./ARCHITECTURE.md).
+Today's AI is incredibly capable.
 
-## Start
+Yet every conversation starts from zero.
 
-```bash
-pnpm install
-pnpm dev
+It doesn't remember what you built yesterday.
+
+It doesn't know how you think.
+
+It doesn't understand years of your work.
+
+The missing piece isn't a better model.
+
+It's **memory**.
+
+Mory is building a **Personal Memory Operating System** — a local-first memory engine that continuously learns from your digital life and provides long-term context for any AI.
+
+Instead of asking AI to remember you,
+
+Mory gives you ownership of your own memory.
+
+---
+
+# Vision
+
+Imagine asking:
+
+> *"Continue the project I started six months ago."*
+
+Instead of searching through notes, chats and repositories...
+
+AI immediately understands:
+
+- what project you're referring to
+- why you started it
+- what decisions were made
+- what problems were left unsolved
+- what should happen next
+
+That's the future Mory is building.
+
+---
+
+# Philosophy
+
+Mory is designed around four core principles.
+
+## 🏠 Local First
+
+Your memory belongs to you.
+
+Everything is stored locally before anything touches the cloud.
+
+No mandatory accounts.
+
+No vendor lock-in.
+
+Cloud exists only for synchronization.
+
+---
+
+## 📜 Memory is Immutable
+
+AI should never rewrite history.
+
+Original memories never change.
+
+AI only creates:
+
+- summaries
+- embeddings
+- relationships
+- tags
+- knowledge
+
+Your raw memories remain untouched forever.
+
+---
+
+## 🌱 AI Learns You
+
+Mory isn't another note-taking app.
+
+It continuously learns:
+
+- how you write
+- how you think
+- what you're building
+- what you're interested in
+
+The longer you use it,
+
+the smarter your AI becomes.
+
+---
+
+## 🔄 Git-inspired Architecture
+
+Mory treats memory like source code.
+
+Every device owns a complete memory repository.
+
+```
+Capture
+
+↓
+
+Memory Objects
+
+↓
+
+Memory Commit
+
+↓
+
+Snapshot
+
+↓
+
+Push / Pull
+
+↓
+
+Sync
 ```
 
-## Architecture Direction
+History should be traceable.
 
-Mory is designed around four principles:
+Synchronization should be optional.
 
-- Local-first: raw memory enters local storage before cloud sync.
-- Immutable history: AI can add summaries, tags, embeddings, and relations, but should not rewrite raw memory.
-- Connector-first capture: clipboard, browser, files, GitHub, chat logs, notes, and future inputs share one memory pipeline.
-- Git-inspired sync: each device can own a complete memory repository and sync through user-owned transports.
+Ownership should always remain local.
 
-## Roadmap
+---
 
-Phase 1:
+# Connectors
+
+Everything that produces context can become a connector.
+
+- ⌨ Keyboard
+- 📋 Clipboard
+- 🌐 Browser
+- 💻 VS Code
+- 🐙 GitHub
+- 📝 Obsidian
+- 📅 Calendar
+- 📧 Email
+- 📂 Files
+- 💬 Chat Applications
+
+More connectors will continue to arrive.
+
+---
+
+# Memory Pipeline
+
+```
+Capture
+
+↓
+
+Filter
+
+↓
+
+Understand
+
+↓
+
+Embedding
+
+↓
+
+Knowledge Graph
+
+↓
+
+Memory Repository
+
+↓
+
+AI Context
+```
+
+Instead of saving everything forever,
+
+Mory continuously organizes your memory into knowledge.
+
+---
+
+# Long-Term Memory
+
+Mory doesn't simply record events.
+
+It builds understanding.
+
+From thousands of tiny interactions,
+
+AI gradually constructs:
+
+- your projects
+- your interests
+- your writing style
+- your decision history
+- your knowledge graph
+
+Your second brain grows naturally over time.
+
+---
+
+# Roadmap
+
+### Phase 1
 
 - Local Memory Repository
-- Manual Capture
 - Clipboard Connector
 - Browser Connector
-- GitHub Sync
-- Timeline and Search
+- Timeline
+- Semantic Search
 
-Phase 2:
+### Phase 2
 
 - Memory Engine
-- Daily Summaries
+- AI Daily Summary
+- Knowledge Graph
 - Embedding Pipeline
-- Semantic Search
-- Knowledge Links
 
-Phase 3:
+### Phase 3
 
-- Chunked Git-like Memory Repository
-- WebDAV Sync
+- Multi-device Sync
+- Git-like Memory Repository
 - Memory Commit
 - Snapshot
-- OPFS Attachments
 
-Phase 4:
+### Phase 4
 
-- Desktop Agent
+- Android Keyboard
+- iOS Keyboard
 - VS Code Extension
 - Open Connector SDK
-- Mobile Input Experiments
 
-## Belief
+---
+
+# Tech Stack
+
+> Still evolving.
+
+- Rust
+- Tauri
+- SQLite
+- PostgreSQL
+- pgvector
+- FastAPI
+- OpenAI Compatible APIs
+
+---
+
+# Our Belief
 
 AI models will become commodities.
 
 Memory will not.
 
-Mory exists to build the memory layer that lets AI finally understand its user.
+The future belongs to AI that truly understands its user.
+
+Mory exists to build that memory.
+
+---
+
+<div align="center">
+
+### Build your own memory.
+
+### Own your own context.
+
+### Let AI finally remember.
+
+⭐ Star this repository if you believe memory is the missing layer of AI.
+
+</div>
