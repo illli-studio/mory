@@ -91,15 +91,16 @@ export function App() {
         </div>
       </header>
 
-      <section className="console">
-        <div className="console-main">
+      <section className="workspace-layout">
+        <div className="workspace-main">
+          <section className="console-main">
           <section className="hero-copy">
             <span className="eyebrow">
               <Archive size={16} />
               Personal memory operating system
             </span>
-            <h1>Turn everything you notice into a durable memory archive.</h1>
-            <p>Mory captures raw memory, preserves history locally, and keeps it ready for search, sync, import, export, and review.</p>
+            <h1>Capture, organize, and retrieve everything worth keeping.</h1>
+            <p>A local-first repository for notes, chats, bills, tasks, waiting items, bookmarks, files, decisions, and logs.</p>
           </section>
 
           <CaptureConsole />
@@ -116,6 +117,26 @@ export function App() {
           {error ? <Notice tone="bad" text={error} /> : null}
           {syncMessage ? <Notice tone="good" text={syncMessage} /> : null}
           <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
+          </section>
+
+          <section className="feed-section">
+            <div className="section-heading">
+              <div>
+                <h2>Memory Feed</h2>
+                <p>{memories.length} visible objects from the local repository</p>
+              </div>
+              <div className="feed-actions">
+                <BookmarkImport />
+                <TextImport />
+                <JsonExport memories={store.memories} />
+                <button className="ghost-button" type="button" onClick={() => useMemoryStore.getState().clear()} title="Remove every local memory object from this browser">
+                  <Trash2 size={16} />
+                  Clear local
+                </button>
+              </div>
+            </div>
+            <MemoryFeed memories={memories} />
+          </section>
         </div>
 
         <aside className="console-side">
@@ -124,25 +145,6 @@ export function App() {
           <GithubSyncCard />
           <ConnectorRail />
         </aside>
-      </section>
-
-      <section className="feed-section">
-        <div className="section-heading">
-          <div>
-            <h2>Memory Feed</h2>
-            <p>{memories.length} visible objects from the local repository</p>
-          </div>
-          <div className="feed-actions">
-            <BookmarkImport />
-            <TextImport />
-            <JsonExport memories={store.memories} />
-            <button className="ghost-button" type="button" onClick={() => useMemoryStore.getState().clear()} title="Remove every local memory object from this browser">
-              <Trash2 size={16} />
-              Clear local
-            </button>
-          </div>
-        </div>
-        <MemoryFeed memories={memories} />
       </section>
       {activeMemory ? (
         <MemoryDetailDrawer
