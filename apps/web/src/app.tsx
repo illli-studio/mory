@@ -60,7 +60,7 @@ const recordModes: Array<{ kind: MemoryKind; label: string; hint: string }> = [
 
 export function App() {
   const store = useMemoryStore();
-  const { load, error, syncMessage, query, setQuery, source, setSource } = store;
+  const { load, error, syncMessage, query, setQuery, source, setSource, isLoading } = store;
   const memories = useMemo(() => selectFilteredMemories(store), [store.memories, store.query, store.source]);
   const stats = useMemo(() => selectStats(store), [store.memories]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -138,6 +138,8 @@ export function App() {
               </div>
             </section>
 
+            <CaptureConsole />
+
             <div className="command-bar">
               <label className="search-input">
                 <Search size={18} />
@@ -146,11 +148,9 @@ export function App() {
               <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sources} />
             </div>
 
-            <CaptureConsole />
-
             <AdvancedFilters />
 
-            {error ? <Notice tone="bad" text={error} /> : null}
+            {error ? <Notice tone="bad" text={error} onRetry={() => void load()} /> : null}
             {syncMessage ? <Notice tone="good" text={syncMessage} /> : null}
             <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
           </section>
@@ -164,6 +164,7 @@ export function App() {
               <div className="feed-actions">
                 <BookmarkImport />
                 <TextImport />
+                <JsonImport />
                 <JsonExport memories={store.memories} />
                 <button className="ghost-button" type="button" onClick={() => useMemoryStore.getState().clear()} title="Remove every local memory object from this browser">
                   <Trash2 size={16} />
@@ -171,7 +172,7 @@ export function App() {
                 </button>
               </div>
             </div>
-            <MemoryFeed memories={memories} />
+            <MemoryFeed memories={memories} loading={isLoading} />
           </section>
         </div>
 
@@ -193,7 +194,17 @@ export function App() {
     </main>
   );
 
-  function MemoryFeed({ memories }: { memories: MemoryObject[] }) {
+  function MemoryFeed({ memories, loading }: { memories: MemoryObject[]; loading: boolean }) {
+    if (loading) {
+      return (
+        <div className="empty-feed" role="status">
+          <Hourglass size={26} />
+          <h3>Loading your local repository...</h3>
+          <p>Reading memories from IndexedDB.</p>
+        </div>
+      );
+    }
+
     if (!memories.length) {
       return (
         <div className="empty-feed">
@@ -251,54 +262,70 @@ function CaptureConsole() {
   const [logMood, setLogMood] = useState("");
   const [saved, setSaved] = useState(false);
   const [clipboardMessage, setClipboardMessage] = useState("");
+  const [captureError, setCaptureError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) {
+      return;
+    }
+    setCaptureError("");
     const sceneContent = buildSceneContent();
     const fallbackContent = sceneContent || title.trim() || tags.trim();
     if (!fallbackContent) {
+      setCaptureError("Add a title, note, or required field before capturing.");
       return;
     }
 
     const detectedUrl = url || extractUrls(`${title} ${fallbackContent}`)[0] || "";
     const nextSource = kind === "chat" ? "chat" : source === "manual" && detectedUrl ? "browser" : source;
     const urlTag = detectedUrl ? domainTag(detectedUrl) : undefined;
-    await add({
-      title: inferSceneTitle(detectedUrl),
-      content: fallbackContent,
-      source: nextSource,
-      kind,
-      url: detectedUrl,
-      fields: buildSceneFields(),
-      tags: [...tags.split(","), urlTag ?? "", kind === "bill" ? billCategory : ""],
-    });
-    setTitle("");
-    setContent("");
-    setTags("");
-    setUrl("");
-    setBillAmount("");
-    setBillMerchant("");
-    setBillCategory("");
-    setBillDate(new Date().toISOString().slice(0, 10));
-    setChatWith("");
-    setFinanceAccount("");
-    setFinanceType("");
-    setFinanceAmount("");
-    setFinanceCurrency("USD");
-    setTaskStatus("todo");
-    setTaskDue("");
-    setTaskOwner("");
-    setWaitingFor("");
-    setWaitingDue("");
-    setWaitingStatus("waiting");
-    setFileName("");
-    setFilePath("");
-    setDecisionOwner("");
-    setDecisionStatus("decided");
-    setLogDate(new Date().toISOString().slice(0, 10));
-    setLogMood("");
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1400);
+    setSubmitting(true);
+    try {
+      const added = await add({
+        title: inferSceneTitle(detectedUrl),
+        content: fallbackContent,
+        source: nextSource,
+        kind,
+        url: detectedUrl,
+        fields: buildSceneFields(),
+        tags: [...tags.split(","), urlTag ?? "", kind === "bill" ? billCategory : ""],
+      });
+      if (!added) {
+        setCaptureError(useMemoryStore.getState().error ?? "Could not save this memory.");
+        return;
+      }
+      setTitle("");
+      setContent("");
+      setTags("");
+      setUrl("");
+      setBillAmount("");
+      setBillMerchant("");
+      setBillCategory("");
+      setBillDate(new Date().toISOString().slice(0, 10));
+      setChatWith("");
+      setFinanceAccount("");
+      setFinanceType("");
+      setFinanceAmount("");
+      setFinanceCurrency("USD");
+      setTaskStatus("todo");
+      setTaskDue("");
+      setTaskOwner("");
+      setWaitingFor("");
+      setWaitingDue("");
+      setWaitingStatus("waiting");
+      setFileName("");
+      setFilePath("");
+      setDecisionOwner("");
+      setDecisionStatus("decided");
+      setLogDate(new Date().toISOString().slice(0, 10));
+      setLogMood("");
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1400);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function buildSceneContent(): string {
@@ -520,12 +547,13 @@ function CaptureConsole() {
           <Clipboard size={17} />
           Paste
         </button>
-        <button type="submit">
+        <button type="submit" disabled={submitting}>
           {saved ? <Check size={17} /> : <Send size={17} />}
-          {saved ? "Saved" : "Capture"}
+          {submitting ? "Saving..." : saved ? "Saved" : "Capture"}
         </button>
       </div>
       {clipboardMessage ? <p className="capture-hint">{clipboardMessage}</p> : null}
+      {captureError ? <p className="capture-error" role="alert">{captureError}</p> : null}
     </form>
   );
 
@@ -749,7 +777,16 @@ function InlineSelect({
 }
 
 function AdvancedFilters() {
-  const { timeRange, setTimeRange, privacy, setPrivacy, tagFilter, setTagFilter, sortBy, setSortBy } = useMemoryStore();
+  const { query, setQuery, source, setSource, timeRange, setTimeRange, privacy, setPrivacy, tagFilter, setTagFilter, sortBy, setSortBy } = useMemoryStore();
+
+  function clearFilters() {
+    setQuery("");
+    setSource("all");
+    setTimeRange("all");
+    setPrivacy("all");
+    setTagFilter("");
+    setSortBy("newest");
+  }
 
   return (
     <section className="advanced-filters">
@@ -773,6 +810,9 @@ function AdvancedFilters() {
         <option value="newest">Newest first</option>
         <option value="score">Score first</option>
       </select>
+      <button type="button" onClick={clearFilters} disabled={!query && source === "all" && timeRange === "all" && privacy === "all" && !tagFilter && sortBy === "newest"}>
+        Clear filters
+      </button>
     </section>
   );
 }
@@ -974,7 +1014,11 @@ function MemoryCard({ memory, selected, onSelect, onOpen }: { memory: MemoryObje
         <button type="button" onClick={() => void update({ ...memory, isPrivate: !memory.isPrivate })}>
           {memory.isPrivate ? "Public" : "Private"}
         </button>
-        <button type="button" onClick={() => void remove(memory.id)}>
+        <button type="button" onClick={() => {
+          if (window.confirm("Delete this memory? This cannot be undone.")) {
+            void remove(memory.id);
+          }
+        }}>
           <Trash2 size={15} />
         </button>
       </div>
@@ -1077,7 +1121,12 @@ function MemoryDetailDrawer({
             <Check size={15} />
             Save
           </button>
-          <button type="button" onClick={() => { void remove(memory.id); onClose(); }}>
+          <button type="button" onClick={() => {
+            if (window.confirm("Delete this memory? This cannot be undone.")) {
+              void remove(memory.id);
+              onClose();
+            }
+          }}>
             <Trash2 size={15} />
             Delete
           </button>
@@ -1219,6 +1268,101 @@ function JsonExport({ memories }: { memories: MemoryObject[] }) {
       <Download size={16} />
       Export JSON
     </button>
+  );
+}
+
+function JsonImport() {
+  const importMany = useMemoryStore((state) => state.importMany);
+  const [error, setError] = useState("");
+
+  async function importJson(file: File) {
+    setError("");
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      const records = Array.isArray(parsed)
+        ? parsed
+        : parsed && typeof parsed === "object" && Array.isArray((parsed as { memories?: unknown }).memories)
+          ? (parsed as { memories: unknown[] }).memories
+          : null;
+
+      if (!records) {
+        throw new Error("JSON must contain a memories array.");
+      }
+      if (!records.length) {
+        throw new Error("JSON contains no memory records.");
+      }
+
+      const recordErrors: string[] = [];
+      const inputs = records.flatMap((record, index) => {
+        try {
+          if (!record || typeof record !== "object") {
+            throw new Error(`Record ${index + 1} is not an object.`);
+          }
+
+          const item = record as {
+            payload?: { title?: unknown; content?: unknown; url?: unknown };
+            title?: unknown;
+            content?: unknown;
+            url?: unknown;
+            source?: MemorySource;
+            kind?: MemoryKind;
+            type?: "raw" | "preview" | "snapshot" | "relation";
+            fields?: Record<string, string | number | boolean | undefined>;
+            tags?: unknown;
+            capturedAt?: unknown;
+            isPrivate?: unknown;
+          };
+          const payload = item.payload;
+          const title = typeof payload?.title === "string" ? payload.title : typeof item.title === "string" ? item.title : "";
+          const content = typeof payload?.content === "string" ? payload.content : typeof item.content === "string" ? item.content : "";
+
+          if (!title.trim() && !content.trim()) {
+            throw new Error(`Record ${index + 1} needs a title or content.`);
+          }
+
+          return [{
+            title,
+            content,
+            url: typeof payload?.url === "string" ? payload.url : typeof item.url === "string" ? item.url : undefined,
+            source: item.source,
+            kind: item.kind,
+            type: item.type,
+            fields: item.fields,
+            tags: Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === "string") : [],
+            capturedAt: typeof item.capturedAt === "string" ? item.capturedAt : undefined,
+            isPrivate: typeof item.isPrivate === "boolean" ? item.isPrivate : undefined,
+          }];
+        } catch (recordError) {
+          recordErrors.push(recordError instanceof Error ? recordError.message : `Record ${index + 1} is invalid.`);
+          return [];
+        }
+      });
+
+      if (!inputs.length) {
+        throw new Error(recordErrors.join(" ") || "JSON contains no valid memory records.");
+      }
+      await importMany(inputs);
+      if (recordErrors.length) {
+        setError(`Imported ${inputs.length}; skipped ${recordErrors.length} invalid record${recordErrors.length === 1 ? "" : "s"}. ${recordErrors.join(" ")}`);
+      }
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "Invalid JSON file.");
+    }
+  }
+
+  return (
+    <label className="bookmark-import" title="Import a Mory JSON export">
+      <Upload size={16} />
+      Import JSON
+      <input type="file" accept=".json,application/json" onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          void importJson(file);
+        }
+        event.currentTarget.value = "";
+      }} />
+      {error ? <span className="import-error">{error}</span> : null}
+    </label>
   );
 }
 
@@ -1502,8 +1646,13 @@ function safeHostname(url?: string): string {
   }
 }
 
-function Notice({ text, tone }: { text: string; tone: "good" | "bad" }) {
-  return <div className={`notice ${tone}`}>{text}</div>;
+function Notice({ text, tone, onRetry }: { text: string; tone: "good" | "bad"; onRetry?: () => void }) {
+  return (
+    <div className={`notice ${tone}`} role={tone === "bad" ? "alert" : "status"}>
+      <span>{text}</span>
+      {onRetry ? <button type="button" onClick={onRetry}>Retry</button> : null}
+    </div>
+  );
 }
 
 function buildCollections(memories: MemoryObject[]): Array<{ tag: string; count: number }> {

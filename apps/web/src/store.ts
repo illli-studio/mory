@@ -24,7 +24,7 @@ interface MemoryState {
   syncMessage?: string;
   github: GithubSyncConfig;
   load: () => Promise<void>;
-  add: (input: CreateMemoryInput) => Promise<void>;
+  add: (input: CreateMemoryInput) => Promise<boolean>;
   importMany: (inputs: CreateMemoryInput[]) => Promise<void>;
   update: (memory: MemoryObject) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -65,22 +65,28 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       const memory = await createMemory(input);
       await saveMemory(memory);
       set({ memories: [memory, ...get().memories] });
+      return true;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to save memory." });
+      return false;
     }
   },
   async importMany(inputs) {
     set({ error: undefined });
     try {
       const created = await Promise.all(inputs.map((input) => createMemory(input)));
+      let savedCount = 0;
+      let skippedCount = 0;
       for (const memory of created) {
         try {
           await saveMemory(memory);
+          savedCount += 1;
         } catch {
-          // Duplicate imports should not block the rest of the batch.
+          skippedCount += 1;
         }
       }
-      set({ memories: await loadMemories(), syncMessage: `Imported ${created.length} memory objects.` });
+      const detail = skippedCount ? ` Skipped ${skippedCount} duplicate${skippedCount === 1 ? "" : "s"}.` : "";
+      set({ memories: await loadMemories(), syncMessage: `Imported ${savedCount} memory object${savedCount === 1 ? "" : "s"}.${detail}` });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Import failed." });
     }
@@ -117,17 +123,35 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
   },
   async pullGithub() {
-    const { github } = get();
+    const { github, memories: localMemories } = get();
     if (!hasGithubConfig(github)) {
       set({ error: "GitHub sync needs token, owner, repo, branch and path." });
       return;
     }
     set({ error: undefined, syncMessage: "Pulling memories from GitHub..." });
     try {
-      const memories = await pullGithubMemories(github);
-      await clearMemories();
+      const remoteMemories = await pullGithubMemories(github);
+      const localById = new Map(localMemories.map((memory) => [memory.id, memory]));
+      const conflicts = remoteMemories.filter((remote) => {
+        const local = localById.get(remote.id);
+        return local && local.contentHash !== remote.contentHash;
+      }).length;
+      const merged = new Map(localById);
+
+      for (const remote of remoteMemories) {
+        if (!merged.has(remote.id)) {
+          merged.set(remote.id, remote);
+        }
+      }
+
+      const memories = Array.from(merged.values()).sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
       await upsertMemories(memories);
-      set({ memories, syncMessage: `Pulled ${memories.length} objects from GitHub.` });
+      set({
+        memories,
+        syncMessage: conflicts
+          ? `Pulled ${remoteMemories.length} remote objects; kept ${conflicts} local conflict${conflicts === 1 ? "" : "s"}.`
+          : `Pulled ${remoteMemories.length} remote objects and kept local memories.`,
+      });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "GitHub pull failed.", syncMessage: undefined });
     }
