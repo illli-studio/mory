@@ -108,7 +108,8 @@ export function App() {
                 onClick={() => {
                   setCaptureKind(mode.kind);
                   setQuery(mode.kind === "note" ? "" : mode.kind);
-                  document.getElementById("capture-stage")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+                  document.getElementById("capture-stage")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
                 }}
               >
                 {recordIcon(mode.kind)}
@@ -567,7 +568,8 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
           {submitting ? "Saving..." : saved ? "Saved" : "Capture"}
         </button>
       </div>
-      {clipboardMessage ? <p className="capture-hint">{clipboardMessage}</p> : null}
+      {clipboardMessage ? <p className="capture-hint" role="status" aria-live="polite">{clipboardMessage}</p> : null}
+      <span className="sr-only" aria-live="polite">{saved ? "Memory saved." : ""}</span>
       {captureError ? <p className="capture-error" role="alert">{captureError}</p> : null}
     </form>
   );
@@ -1663,7 +1665,7 @@ function safeHostname(url?: string): string {
 
 function Notice({ text, tone, onRetry }: { text: string; tone: "good" | "bad"; onRetry?: () => void }) {
   return (
-    <div className={`notice ${tone}`} role={tone === "bad" ? "alert" : "status"}>
+    <div className={`notice ${tone}`} role={tone === "bad" ? "alert" : "status"} aria-live={tone === "bad" ? "assertive" : "polite"} aria-atomic="true">
       <span>{text}</span>
       {onRetry ? <button type="button" onClick={onRetry}>Retry</button> : null}
     </div>

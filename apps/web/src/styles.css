@@ -1621,6 +1621,63 @@ button {
   }
 }
 
+/* Keyboard and assistive-state contract */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid #d56743;
+  outline-offset: 3px;
+}
+
+:where(button, a, input, select, textarea):focus:not(:focus-visible) {
+  outline: none;
+}
+
+:where(input, select, textarea):focus-visible {
+  border-color: #d56743;
+  box-shadow: 0 0 0 3px rgba(213, 103, 67, 0.2);
+}
+
+.record-rail-list,
+.record-mode-tabs {
+  scrollbar-gutter: stable;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .console-main,
+  .console-side,
+  .feed-section,
+  .memory-card,
+  .record-mode-tabs button,
+  .capture-bottom button {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
 /* Layout rebuild: a single visible task path, with utilities demoted */
 .record-rail {
   width: min(1480px, 100%);
@@ -2395,4 +2452,40 @@ textarea {
   .feed-section { padding: 16px; }
   .workbench-intro h1 { font-size: 44px; }
   .section-heading h2 { font-size: 26px; }
+}
+
+/* Final accessibility overrides must come after theme and layout rules. */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid #d56743;
+  outline-offset: 3px;
+}
+
+:where(button, a, input, select, textarea):focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .console-main,
+  .console-side,
+  .feed-section,
+  .memory-card,
+  .record-mode-tabs button,
+  .capture-bottom button {
+    animation: none !important;
+    transform: none !important;
+  }
 }
