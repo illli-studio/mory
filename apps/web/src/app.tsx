@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { createPreview, domainTag, extractUrls, type MemoryKind, type MemoryObject, type MemorySource } from "@mory/memory-core";
 import { selectFilteredMemories, selectStats, useMemoryStore } from "./store";
+import { primaryLayoutRegions } from "./layout-contract";
 
 const sources: Array<{ value: MemorySource | "all"; label: string }> = [
   { value: "all", label: "All sources" },
@@ -106,6 +107,7 @@ export function App() {
                 className={captureKind === mode.kind ? "active" : ""}
                 onClick={() => {
                   setCaptureKind(mode.kind);
+                  setQuery(mode.kind === "note" ? "" : mode.kind);
                   document.getElementById("capture-stage")?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
               >
@@ -141,12 +143,12 @@ export function App() {
               </div>
             </section>
 
-            <section id="capture-stage" className="task-stage capture-stage">
+            <section id={primaryLayoutRegions[0]} className={`task-stage ${primaryLayoutRegions[0]}`}>
               <div className="stage-kicker"><span>01</span><strong>Capture</strong><em>Put something useful somewhere safe.</em></div>
               <CaptureConsole kind={captureKind} onKindChange={setCaptureKind} />
             </section>
 
-            <section className="task-stage search-stage">
+            <section className={`task-stage ${primaryLayoutRegions[1]}`}>
               <div className="stage-kicker"><span>02</span><strong>Find</strong><em>Search, filter, then choose what matters.</em></div>
               <div className="command-bar">
                 <label className="search-input">
@@ -164,7 +166,7 @@ export function App() {
             <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
           </section>
 
-          <section className="feed-section task-stage feed-stage">
+          <section className={`feed-section task-stage ${primaryLayoutRegions[2]}`}>
             <div className="section-heading">
               <div className="stage-kicker"><span>03</span><strong>Process</strong><em>Browse the living feed and open details when needed.</em>
                 <h2>Memory Feed</h2>
@@ -185,7 +187,7 @@ export function App() {
           </section>
         </div>
 
-        <aside className="console-side utility-rail" aria-label="Repository utilities">
+        <aside className={`console-side ${primaryLayoutRegions[3]}`} aria-label="Repository utilities">
           <div className="utility-rail-heading">
             <span>Secondary workspace</span>
             <strong>Repository tools</strong>
