@@ -1621,6 +1621,249 @@ button {
   }
 }
 
+/* Layout rebuild: a single visible task path, with utilities demoted */
+.record-rail {
+  width: min(1480px, 100%);
+  margin: 0 auto 18px;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border: 1px solid rgba(245, 239, 228, 0.18);
+  border-radius: 16px;
+  background: rgba(245, 239, 228, 0.09);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.record-rail-label,
+.utility-rail-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.record-rail-label span,
+.utility-rail-heading span,
+.utility-rail-heading p {
+  color: rgba(245, 239, 228, 0.5);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.record-rail-label strong,
+.utility-rail-heading strong {
+  color: #f5efe4;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.record-rail-list {
+  display: flex;
+  min-width: 0;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.record-rail-list button,
+.record-rail-shortcuts button {
+  min-height: 36px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(245, 239, 228, 0.18);
+  border-radius: 9px;
+  padding: 0 10px;
+  background: rgba(245, 239, 228, 0.06);
+  color: rgba(245, 239, 228, 0.72);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.record-rail-list button strong {
+  color: rgba(245, 239, 228, 0.4);
+  font-size: 10px;
+}
+
+.record-rail-list button:hover,
+.record-rail-list button.active,
+.record-rail-shortcuts button:hover {
+  border-color: #d56743;
+  background: #d56743;
+  color: #fff8ef;
+}
+
+.record-rail-shortcuts {
+  display: flex;
+  gap: 6px;
+}
+
+.record-rail-shortcuts button {
+  border: 0;
+  min-height: 30px;
+  padding: 0 8px;
+  color: rgba(245, 239, 228, 0.58);
+  font-size: 10px;
+}
+
+.workspace-layout {
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 18px;
+}
+
+.workspace-main {
+  grid-column: 1;
+  display: grid;
+  gap: 18px;
+}
+
+.console-side {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.console-main {
+  gap: 18px;
+}
+
+.task-stage {
+  scroll-margin-top: 18px;
+}
+
+.stage-kicker {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 2px 8px;
+}
+
+.stage-kicker > span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.stage-kicker > strong {
+  color: var(--text);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.stage-kicker > em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.capture-stage .capture-console {
+  box-shadow: 8px 8px 0 rgba(213, 103, 67, 0.13);
+}
+
+.search-stage {
+  padding-top: 3px;
+}
+
+.search-stage .advanced-filters {
+  margin-top: 8px;
+}
+
+.feed-stage {
+  margin: 0;
+  padding: 22px;
+}
+
+.feed-stage .section-heading {
+  align-items: start;
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.feed-stage .section-heading .stage-kicker {
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  margin-bottom: 0;
+}
+
+.feed-stage .section-heading .stage-kicker em {
+  grid-column: 2;
+}
+
+.feed-stage .section-heading h2 {
+  grid-column: 2;
+  margin-top: 8px;
+}
+
+.feed-stage .section-heading p {
+  grid-column: 2;
+}
+
+.utility-rail {
+  align-content: start;
+}
+
+.utility-rail-heading {
+  padding: 4px 4px 8px;
+}
+
+.utility-rail-heading p {
+  margin: 3px 0 0;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@media (max-width: 1120px) {
+  .record-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .record-rail-shortcuts {
+    justify-content: flex-start;
+  }
+
+  .workspace-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-main,
+  .console-side {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .console-side {
+    order: 2;
+  }
+}
+
+@media (max-width: 680px) {
+  .record-rail {
+    margin-bottom: 12px;
+    padding: 8px;
+  }
+
+  .stage-kicker {
+    grid-template-columns: auto auto;
+  }
+
+  .stage-kicker > em {
+    grid-column: 2;
+  }
+
+  .feed-stage .section-heading .stage-kicker {
+    grid-template-columns: auto auto;
+  }
+}
+
 /* Mory / Observatory editorial refresh */
 :root {
   --bg: #101513;

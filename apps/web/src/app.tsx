@@ -65,6 +65,7 @@ export function App() {
   const stats = useMemo(() => selectStats(store), [store.memories]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeMemoryId, setActiveMemoryId] = useState<string | null>(null);
+  const [captureKind, setCaptureKind] = useState<MemoryKind>("note");
   const selectedMemories = useMemo(() => store.memories.filter((memory) => selectedIds.includes(memory.id)), [store.memories, selectedIds]);
   const activeMemory = useMemo(() => store.memories.find((memory) => memory.id === activeMemoryId), [store.memories, activeMemoryId]);
 
@@ -90,37 +91,39 @@ export function App() {
         </div>
       </header>
 
+      <section className="record-rail" aria-label="Record type workspace">
+        <div className="record-rail-label">
+          <span>Workspace</span>
+          <strong>Record rail</strong>
+        </div>
+        <div className="record-rail-list">
+          {recordModes.map((mode) => {
+            const count = store.memories.filter((memory) => (memory.kind ?? "note") === mode.kind).length;
+            return (
+              <button
+                key={mode.kind}
+                type="button"
+                className={captureKind === mode.kind ? "active" : ""}
+                onClick={() => {
+                  setCaptureKind(mode.kind);
+                  document.getElementById("capture-stage")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                {recordIcon(mode.kind)}
+                <span>{mode.label}</span>
+                <strong>{count}</strong>
+              </button>
+            );
+          })}
+        </div>
+        <div className="record-rail-shortcuts" aria-label="Shortcuts">
+          <button type="button" onClick={() => setQuery("private")}>Private</button>
+          <button type="button" onClick={() => setQuery("waiting")}>Waiting</button>
+          <button type="button" onClick={() => setQuery("bookmark")}>Bookmarks</button>
+        </div>
+      </section>
+
       <section className="workspace-layout">
-        <aside className="workspace-nav" aria-label="Record type navigation">
-          <div className="nav-brand-card">
-            <div className="brand-glyph">
-              <Archive size={21} />
-            </div>
-            <div>
-              <strong>Mory</strong>
-              <span>Storehouse</span>
-            </div>
-          </div>
-          <div className="nav-section-label">Record types</div>
-          <div className="record-nav-list">
-            {recordModes.map((mode) => {
-              const count = store.memories.filter((memory) => (memory.kind ?? "note") === mode.kind).length;
-              return (
-                <button key={mode.kind} type="button" onClick={() => setQuery(mode.kind === "note" ? "" : mode.kind)}>
-                  {recordIcon(mode.kind)}
-                  <span>{mode.label}</span>
-                  <strong>{count}</strong>
-                </button>
-              );
-            })}
-          </div>
-          <div className="nav-section-label">Shortcuts</div>
-          <div className="shortcut-list">
-            <button type="button" onClick={() => setQuery("private")}>Private</button>
-            <button type="button" onClick={() => setQuery("waiting")}>Waiting</button>
-            <button type="button" onClick={() => setQuery("bookmark")}>Bookmarks</button>
-          </div>
-        </aside>
         <div className="workspace-main">
           <section className="console-main">
             <section className="workbench-intro">
@@ -138,26 +141,32 @@ export function App() {
               </div>
             </section>
 
-            <CaptureConsole />
+            <section id="capture-stage" className="task-stage capture-stage">
+              <div className="stage-kicker"><span>01</span><strong>Capture</strong><em>Put something useful somewhere safe.</em></div>
+              <CaptureConsole kind={captureKind} onKindChange={setCaptureKind} />
+            </section>
 
-            <div className="command-bar">
-              <label className="search-input">
-                <Search size={18} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search memories, tags, links, bills, tasks..." />
-              </label>
-              <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sources} />
-            </div>
+            <section className="task-stage search-stage">
+              <div className="stage-kicker"><span>02</span><strong>Find</strong><em>Search, filter, then choose what matters.</em></div>
+              <div className="command-bar">
+                <label className="search-input">
+                  <Search size={18} />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search memories, tags, links, bills, tasks..." />
+                </label>
+                <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sources} />
+              </div>
 
-            <AdvancedFilters />
+              <AdvancedFilters />
+            </section>
 
             {error ? <Notice tone="bad" text={error} onRetry={() => void load()} /> : null}
             {syncMessage ? <Notice tone="good" text={syncMessage} /> : null}
             <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
           </section>
 
-          <section className="feed-section">
+          <section className="feed-section task-stage feed-stage">
             <div className="section-heading">
-              <div>
+              <div className="stage-kicker"><span>03</span><strong>Process</strong><em>Browse the living feed and open details when needed.</em>
                 <h2>Memory Feed</h2>
                 <p>{memories.length} visible objects from the local repository</p>
               </div>
@@ -176,7 +185,12 @@ export function App() {
           </section>
         </div>
 
-        <aside className="console-side">
+        <aside className="console-side utility-rail" aria-label="Repository utilities">
+          <div className="utility-rail-heading">
+            <span>Secondary workspace</span>
+            <strong>Repository tools</strong>
+            <p>Useful context, kept out of the capture path.</p>
+          </div>
           <SystemHealth stats={stats} />
           <CollectionsPanel memories={store.memories} />
           <GithubSyncCard />
@@ -231,9 +245,8 @@ export function App() {
   }
 }
 
-function CaptureConsole() {
+function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange: (kind: MemoryKind) => void }) {
   const { add } = useMemoryStore();
-  const [kind, setKind] = useState<MemoryKind>("note");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
@@ -527,7 +540,7 @@ function CaptureConsole() {
         </div>
         <div className="record-mode-tabs" role="tablist" aria-label="Record type">
           {recordModes.map((mode) => (
-            <button key={mode.kind} type="button" className={kind === mode.kind ? "active" : ""} onClick={() => setKind(mode.kind)} title={mode.hint}>
+            <button key={mode.kind} type="button" className={kind === mode.kind ? "active" : ""} onClick={() => onKindChange(mode.kind)} title={mode.hint}>
               {recordIcon(mode.kind)}
               <span>{mode.label}</span>
             </button>
