@@ -138,6 +138,14 @@ button {
   box-shadow: 0 8px 22px rgba(25, 28, 35, 0.06);
 }
 
+.brand-glyph.logo-mark {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .brand-lockup strong,
 .brand-lockup span {
   display: block;
@@ -204,30 +212,33 @@ button {
 
 .nav-brand-card {
   width: 100%;
-  border-radius: 18px;
-  background: var(--text);
-  color: var(--surface);
-  padding: 12px;
+  min-height: 62px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 4px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-  border: 1px solid transparent;
+  gap: 12px;
+  margin-bottom: 18px;
   text-align: left;
   cursor: pointer;
+  box-shadow: none;
 }
 
 .nav-brand-card:hover {
-  background: var(--primary-hover);
-  transform: translateY(-1px);
+  background: rgba(247, 246, 241, 0.72);
+  border-color: transparent;
+  color: var(--text);
 }
 
 .nav-brand-card .brand-glyph {
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 255, 252, 0.1);
-  border-color: rgba(255, 255, 252, 0.16);
-  color: var(--surface);
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 0;
+  color: var(--accent);
   box-shadow: none;
 }
 
@@ -237,7 +248,7 @@ button {
 }
 
 .nav-brand-card span {
-  color: rgba(255, 255, 252, 0.62);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 760;
 }
@@ -2494,4 +2505,16 @@ button {
   outline: none;
   border-color: #b8d6cb;
   box-shadow: 0 0 0 3px rgba(36, 95, 81, 0.13);
+}
+
+.nav-brand-card[data-slot="button"],
+.nav-brand-card[data-slot="button"]:hover,
+.nav-brand-card[data-slot="button"]:focus-visible {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.nav-brand-card[data-slot="button"]:hover {
+  background: rgba(247, 246, 241, 0.72);
 }

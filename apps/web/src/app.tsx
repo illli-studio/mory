@@ -43,6 +43,7 @@ import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Dialog, DialogContent } from "./components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./components/ui/dropdown-menu";
+import { MoryLogo } from "./components/mory-logo";
 
 const sources: Array<{ value: MemorySource | "all"; label: string }> = [
   { value: "all", label: "All sources" },
@@ -111,8 +112,8 @@ export function App() {
     <main className="product-shell">
       <header className="product-header">
         <div className="brand-lockup">
-          <div className="brand-glyph">
-            <Archive size={22} />
+          <div className="brand-glyph logo-mark">
+            <MoryLogo size={38} />
           </div>
           <div>
             <strong>Mory</strong>
@@ -127,9 +128,9 @@ export function App() {
 
       <section className="workspace-layout">
         <aside className="workspace-nav" aria-label="Record type navigation">
-          <Button className="nav-brand-card" type="button" onClick={() => setCaptureOpen(true)} aria-label="Open memory capture">
-            <div className="brand-glyph">
-              <Archive size={21} />
+          <Button variant="ghost" className="nav-brand-card" type="button" onClick={() => setCaptureOpen(true)} aria-label="Open memory capture">
+            <div className="brand-glyph logo-mark">
+              <MoryLogo size={38} />
             </div>
             <div>
               <strong>Mory</strong>
