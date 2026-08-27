@@ -12,6 +12,7 @@
   "dependencies": {
     "@mory/memory-core": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-tabs": "^1.1.21",
     "@vitejs/plugin-react": "^5.0.0",

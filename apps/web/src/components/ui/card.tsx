@@ -1,5 +1,10 @@
+import { forwardRef } from "react";
 import { cn } from "../../lib/utils";
 
-export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <section className={cn("ui-card", className)}>{children}</section>;
-}
+export const Card = forwardRef<HTMLElement, React.ComponentPropsWithoutRef<"section">>(({ className, children, ...props }, ref) => (
+  <section ref={ref} data-slot="card" className={cn("rounded-xl border border-border bg-card text-card-foreground shadow-sm", className)} {...props}>
+    {children}
+  </section>
+));
+
+Card.displayName = "Card";
