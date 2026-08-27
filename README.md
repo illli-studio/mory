@@ -280,6 +280,18 @@ Your second brain grows naturally over time.
 - FastAPI
 - OpenAI Compatible APIs
 
+## Agent memory service
+
+The web app can connect to the shared Mory API from the `Mory API` panel. Start it with:
+
+```bash
+MORY_API_TOKEN=choose-a-token pnpm api:dev
+```
+
+Then enter the API URL and the same token in the web app. Hermes can use the adapter in `plugins/hermes` with `MORY_API_URL` and `MORY_API_TOKEN`; both clients write to the same SQLite repository. The API stores append-oriented memory records, hash-deduplicates exact repeats, keeps event history, supports BM25/entity search, and uses tombstone deletes.
+
+The GitHub Sync panel can commit both `mory/mory.sqlite` and a readable `mory/memories.json` snapshot. GitHub is a versioned backup target; the running SQLite file remains the source of truth.
+
 ---
 
 # Our Belief

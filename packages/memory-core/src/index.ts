@@ -43,6 +43,7 @@ export interface MemoryObject {
   isPrivate?: boolean;
   parentIds?: string[];
   schemaVersion: number;
+  actor?: { type: "human" | "agent" | "ai" | "plugin"; id?: string };
 }
 
 export interface CreateMemoryInput {

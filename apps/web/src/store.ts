@@ -54,7 +54,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   async load() {
     set({ isLoading: true, error: undefined });
     try {
-      set({ memories: await loadMemories(), isLoading: false });
+      set({ memories: (await loadMemories()).map(normalizeMemory), isLoading: false });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load memories.", isLoading: false });
     }
@@ -127,7 +127,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       const memories = await pullGithubMemories(github);
       await clearMemories();
       await upsertMemories(memories);
-      set({ memories, syncMessage: `Pulled ${memories.length} objects from GitHub.` });
+      const normalized = memories.map(normalizeMemory);
+      set({ memories: normalized, syncMessage: `Pulled ${normalized.length} objects from GitHub.` });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "GitHub pull failed.", syncMessage: undefined });
     }
@@ -180,10 +181,37 @@ export function selectFilteredMemories(state: MemoryState): MemoryObject[] {
 
   return filtered.sort((a, b) => {
     if (state.sortBy === "score") {
-      return b.score - a.score || b.capturedAt.localeCompare(a.capturedAt);
+      return (b.score ?? 0) - (a.score ?? 0) || String(b.capturedAt ?? "").localeCompare(String(a.capturedAt ?? ""));
     }
-    return b.capturedAt.localeCompare(a.capturedAt);
+    return String(b.capturedAt ?? "").localeCompare(String(a.capturedAt ?? ""));
   });
+}
+
+function normalizeMemory(memory: MemoryObject): MemoryObject {
+  const candidate = memory as Partial<MemoryObject> & { payload?: Partial<MemoryObject["payload"]> };
+  const payload = (candidate.payload ?? {}) as Partial<MemoryObject["payload"]>;
+  const validSources = ["manual", "clipboard", "browser", "file", "chat", "github"] as const;
+  const validTypes = ["raw", "preview", "snapshot", "relation"] as const;
+  const source = validSources.includes(candidate.source as typeof validSources[number]) ? candidate.source! : "manual";
+  const type = validTypes.includes(candidate.type as typeof validTypes[number]) ? candidate.type! : "raw";
+
+  return {
+    ...memory,
+    id: String(candidate.id ?? crypto.randomUUID()),
+    source,
+    type,
+    capturedAt: typeof candidate.capturedAt === "string" && candidate.capturedAt ? candidate.capturedAt : new Date().toISOString(),
+    contentHash: String(candidate.contentHash ?? candidate.id ?? crypto.randomUUID()),
+    payload: {
+      title: String(payload.title ?? "Untitled memory"),
+      content: String(payload.content ?? ""),
+      url: payload.url ? String(payload.url) : undefined,
+    },
+    tags: Array.isArray(candidate.tags) ? candidate.tags.map(String) : [],
+    score: typeof candidate.score === "number" && Number.isFinite(candidate.score) ? candidate.score : 1,
+    schemaVersion: typeof candidate.schemaVersion === "number" ? candidate.schemaVersion : 1,
+    fields: candidate.fields && typeof candidate.fields === "object" ? candidate.fields : {},
+  };
 }
 
 export function selectStats(state: MemoryState) {
@@ -196,6 +224,9 @@ function matchesTimeRange(capturedAt: string, range: MemoryState["timeRange"], n
   }
 
   const captured = new Date(capturedAt);
+  if (Number.isNaN(captured.getTime())) {
+    return false;
+  }
   const diffMs = now.getTime() - captured.getTime();
   const dayMs = 24 * 60 * 60 * 1000;
 

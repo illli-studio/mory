@@ -7,3 +7,4 @@ dist/
 !.env.example
 *.local
 tmp/
+apps/api/data/

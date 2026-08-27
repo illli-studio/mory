@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @mory/web dev",
+    "api:dev": "pnpm --filter @mory/api dev",
+    "api:start": "pnpm --filter @mory/api start",
     "build": "pnpm --filter @mory/memory-core build && pnpm --filter @mory/web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint"

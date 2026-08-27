@@ -17,7 +17,8 @@
     "jsx": "react-jsx",
     "types": ["vite/client"],
     "paths": {
-      "@mory/memory-core": ["../../packages/memory-core/src"]
+      "@mory/memory-core": ["../../packages/memory-core/src"],
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"]

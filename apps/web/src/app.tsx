@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Archive,
@@ -34,6 +34,13 @@ import {
 } from "lucide-react";
 import { createPreview, domainTag, extractUrls, type MemoryKind, type MemoryObject, type MemorySource } from "@mory/memory-core";
 import { selectFilteredMemories, selectStats, useMemoryStore } from "./store";
+import { backupRemoteGithub, getMoryApiConfig, hasMoryApiConfig, setMoryApiConfig } from "./mory-api";
+import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
+import { Card } from "./components/ui/card";
+import { Input } from "./components/ui/input";
+import { Textarea } from "./components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 
 const sources: Array<{ value: MemorySource | "all"; label: string }> = [
   { value: "all", label: "All sources" },
@@ -65,12 +72,36 @@ export function App() {
   const stats = useMemo(() => selectStats(store), [store.memories]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeMemoryId, setActiveMemoryId] = useState<string | null>(null);
+  const [activeUtilityPanel, setActiveUtilityPanel] = useState<UtilityPanel | null>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const recordNavRef = useRef<HTMLDivElement>(null);
+  const [compactRecordNav, setCompactRecordNav] = useState(false);
   const selectedMemories = useMemo(() => store.memories.filter((memory) => selectedIds.includes(memory.id)), [store.memories, selectedIds]);
   const activeMemory = useMemo(() => store.memories.find((memory) => memory.id === activeMemoryId), [store.memories, activeMemoryId]);
+  const selectedRecordKind = recordModes.some((mode) => mode.kind === query) ? query as MemoryKind : "note";
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!captureOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [captureOpen]);
+
+  useEffect(() => {
+    const nav = recordNavRef.current;
+    if (!nav) return;
+    const measure = () => setCompactRecordNav(nav.scrollWidth > nav.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <main className="product-shell">
@@ -92,7 +123,7 @@ export function App() {
 
       <section className="workspace-layout">
         <aside className="workspace-nav" aria-label="Record type navigation">
-          <div className="nav-brand-card">
+          <Button className="nav-brand-card" type="button" onClick={() => setCaptureOpen(true)} aria-label="Open memory capture">
             <div className="brand-glyph">
               <Archive size={21} />
             </div>
@@ -100,88 +131,92 @@ export function App() {
               <strong>Mory</strong>
               <span>Storehouse</span>
             </div>
-          </div>
+          </Button>
           <div className="nav-section-label">Record types</div>
-          <div className="record-nav-list">
+          <div ref={recordNavRef} className={compactRecordNav ? "record-nav-list measure-only" : "record-nav-list"}>
             {recordModes.map((mode) => {
               const count = store.memories.filter((memory) => (memory.kind ?? "note") === mode.kind).length;
               return (
-                <button key={mode.kind} type="button" onClick={() => setQuery(mode.kind === "note" ? "" : mode.kind)}>
+                <Button key={mode.kind} type="button" onClick={() => { setActiveUtilityPanel(null); setQuery(mode.kind === "note" ? "" : mode.kind); }}>
                   {recordIcon(mode.kind)}
                   <span>{mode.label}</span>
                   <strong>{count}</strong>
-                </button>
+                </Button>
               );
             })}
           </div>
+          {compactRecordNav ? <RecordTypeSelect value={selectedRecordKind} onChange={(value) => { setActiveUtilityPanel(null); setQuery(value === "note" ? "" : value); }} /> : null}
           <div className="nav-section-label">Shortcuts</div>
           <div className="shortcut-list">
-            <button type="button" onClick={() => setQuery("private")}>Private</button>
-            <button type="button" onClick={() => setQuery("waiting")}>Waiting</button>
-            <button type="button" onClick={() => setQuery("bookmark")}>Bookmarks</button>
+            <Button type="button" onClick={() => { setActiveUtilityPanel(null); setQuery("private"); }}>Private</Button>
+            <Button type="button" onClick={() => { setActiveUtilityPanel(null); setQuery("waiting"); }}>Waiting</Button>
+            <Button type="button" onClick={() => { setActiveUtilityPanel(null); setQuery("bookmark"); }}>Bookmarks</Button>
+          </div>
+          <div className="nav-section-label">Manage</div>
+          <div className="utility-nav-list">
+            <UtilityNavButton icon={<SlidersHorizontal size={16} />} label="Settings" active={activeUtilityPanel !== null} onClick={() => toggleUtilityPanel("access")} />
           </div>
         </aside>
         <div className="workspace-main">
-          <section className="console-main">
-            <section className="workbench-intro">
-              <div>
-                <span className="eyebrow">
-                  <Archive size={15} />
-                  Today
-                </span>
-                <h1>Store what matters.</h1>
-              </div>
-              <div className="today-strip" aria-label="Repository summary">
-                <Metric label="Saved" value={stats.total} />
-                <Metric label="Today" value={stats.today} />
-                <Metric label="Topics" value={stats.tags.length} />
-              </div>
-            </section>
-
+        {activeUtilityPanel ? (
+          <SettingsPage panel={activeUtilityPanel} stats={stats} memories={store.memories} onPanelChange={setActiveUtilityPanel} onConnected={() => void load()} />
+        ) : (
+          <section className="feed-section">
             <div className="command-bar">
               <label className="search-input">
                 <Search size={18} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search memories, tags, links, bills, tasks..." />
+                <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search memories, tags, links, bills, tasks..." />
               </label>
               <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sources} />
             </div>
-
-            <CaptureConsole />
 
             <AdvancedFilters />
 
             {error ? <Notice tone="bad" text={error} /> : null}
             {syncMessage ? <Notice tone="good" text={syncMessage} /> : null}
             <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
-          </section>
-
-          <section className="feed-section">
             <div className="section-heading">
               <div>
                 <h2>Memory Feed</h2>
-                <p>{memories.length} visible objects from the local repository</p>
+                <p>{memories.length} of {stats.total} memories</p>
+              </div>
+              <div className="feed-summary" aria-label="Repository summary">
+                <span><strong>{stats.today}</strong> today</span>
+                <span><strong>{stats.tags.length}</strong> topics</span>
               </div>
               <div className="feed-actions">
                 <BookmarkImport />
                 <TextImport />
                 <JsonExport memories={store.memories} />
-                <button className="ghost-button" type="button" onClick={() => useMemoryStore.getState().clear()} title="Remove every local memory object from this browser">
+                <Button className="ghost-button" type="button" onClick={() => useMemoryStore.getState().clear()} title="Remove every local memory object from this browser">
                   <Trash2 size={16} />
                   Clear local
-                </button>
+                </Button>
               </div>
             </div>
             <MemoryFeed memories={memories} />
           </section>
+        )}
         </div>
 
-        <aside className="console-side">
-          <SystemHealth stats={stats} />
-          <CollectionsPanel memories={store.memories} />
-          <GithubSyncCard />
-          <ConnectorRail />
-        </aside>
       </section>
+      {captureOpen ? (
+        <>
+          <Button className="capture-modal-backdrop" type="button" aria-label="Close memory capture" onClick={() => setCaptureOpen(false)} />
+          <section className="capture-modal" role="dialog" aria-modal="true" aria-label="Capture a memory">
+            <header className="capture-modal-header">
+              <div>
+                <span className="eyebrow"><Archive size={15} /> New memory</span>
+                <h2>Capture something worth keeping</h2>
+              </div>
+              <Button className="utility-drawer-close" type="button" onClick={() => setCaptureOpen(false)} aria-label="Close memory capture">×</Button>
+            </header>
+            <div className="capture-modal-body">
+              <CaptureConsole />
+            </div>
+          </section>
+        </>
+      ) : null}
       {activeMemory ? (
         <MemoryDetailDrawer
           memory={activeMemory}
@@ -205,7 +240,16 @@ export function App() {
     }
 
     return (
-      <div className="memory-grid">
+      <>
+        <div className="memory-list-header" aria-hidden="true">
+        <span>Time</span>
+        <span>Entity</span>
+        <span>Memory content</span>
+        <span>Category</span>
+        <span>Lifecycle</span>
+        <span>Action</span>
+        </div>
+        <div className="memory-grid">
         {memories.map((memory) => (
           <MemoryCard
             key={memory.id}
@@ -215,9 +259,117 @@ export function App() {
             onOpen={() => setActiveMemoryId(memory.id)}
           />
         ))}
-      </div>
+        </div>
+      </>
     );
   }
+
+  function toggleUtilityPanel(panel: UtilityPanel) {
+    setActiveUtilityPanel((current) => (current === panel ? null : panel));
+  }
+}
+
+type UtilityPanel = "health" | "collections" | "access" | "github" | "connectors";
+
+const utilityPanels: Array<{ value: UtilityPanel; label: string }> = [
+  { value: "access", label: "Mory API" },
+  { value: "github", label: "GitHub" },
+  { value: "connectors", label: "Connectors" },
+  { value: "collections", label: "Topics" },
+  { value: "health", label: "Health" },
+];
+
+function UtilityNavButton({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <Button className={active ? "utility-nav-button active" : "utility-nav-button"} type="button" onClick={onClick} aria-pressed={active}>
+      {icon}
+      <span>{label}</span>
+      <ChevronDown size={14} />
+    </Button>
+  );
+}
+
+function SettingsPage({
+  panel,
+  stats,
+  memories,
+  onPanelChange,
+  onConnected,
+}: {
+  panel: UtilityPanel;
+  stats: ReturnType<typeof selectStats>;
+  memories: MemoryObject[];
+  onPanelChange: (panel: UtilityPanel | null) => void;
+  onConnected: () => void;
+}) {
+  const settingsTabsRef = useRef<HTMLDivElement>(null);
+  const [compactSettingsTabs, setCompactSettingsTabs] = useState(false);
+
+  useEffect(() => {
+    const tabs = settingsTabsRef.current;
+    if (!tabs) return;
+    const measure = () => setCompactSettingsTabs(tabs.scrollWidth > tabs.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(tabs);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <section className="settings-page">
+      <header className="settings-page-header">
+        <div>
+          <span className="eyebrow"><SlidersHorizontal size={15} /> Repository settings</span>
+          <h1>Settings</h1>
+          <p>Manage connections and repository tools in one place.</p>
+        </div>
+      </header>
+      <Tabs value={panel} onValueChange={(value) => onPanelChange(value as UtilityPanel)}>
+      <TabsList ref={settingsTabsRef} className={compactSettingsTabs ? "settings-tabs measure-only" : "settings-tabs"} aria-label="Settings sections">
+        {utilityPanels.map((item) => (
+          <TabsTrigger key={item.value} value={item.value}>{item.label}</TabsTrigger>
+        ))}
+      </TabsList>
+      </Tabs>
+      {compactSettingsTabs ? (
+        <div className="settings-select">
+          <InlineSelect value={panel} onChange={(value) => onPanelChange(value as UtilityPanel)} options={utilityPanels.map((item) => ({ value: item.value, label: item.label }))} />
+        </div>
+      ) : null}
+      <div className="settings-content">
+        {panel === "health" ? <SystemHealth stats={stats} /> : null}
+        {panel === "collections" ? <CollectionsPanel memories={memories} /> : null}
+        {panel === "access" ? <MoryAccessCard onConnected={onConnected} /> : null}
+        {panel === "github" ? <GithubSyncCard /> : null}
+        {panel === "connectors" ? <ConnectorRail /> : null}
+      </div>
+    </section>
+  );
+}
+
+function MoryAccessCard({ onConnected }: { onConnected: () => void }) {
+  const initial = getMoryApiConfig();
+  const [url, setUrl] = useState(initial.url);
+  const [token, setToken] = useState(initial.token);
+  const connected = hasMoryApiConfig();
+
+  function save() {
+    setMoryApiConfig({ url, token });
+    onConnected();
+  }
+
+  return (
+    <section className="side-card sync-card">
+      <div className="card-title"><Cloud size={17} /><h3>Mory API</h3></div>
+      <p className="sync-note">Connect the website and Hermes to one shared memory repository.</p>
+      <Input value={url} onChange={(event) => setUrl(event.target.value)} aria-label="Mory API URL" placeholder="http://127.0.0.1:8787" />
+      <Input className="token-input" type="password" value={token} onChange={(event) => setToken(event.target.value)} aria-label="Mory API token" placeholder="Mory API token" />
+      <div className="sync-actions">
+        <Button className="primary-action" type="button" onClick={save}>{connected ? "Reconnect" : "Connect"}</Button>
+        <span className="connector-status">{connected ? "Connected" : "Local browser mode"}</span>
+      </div>
+    </section>
+  );
 }
 
 function CaptureConsole() {
@@ -251,6 +403,19 @@ function CaptureConsole() {
   const [logMood, setLogMood] = useState("");
   const [saved, setSaved] = useState(false);
   const [clipboardMessage, setClipboardMessage] = useState("");
+  const recordTabsRef = useRef<HTMLDivElement>(null);
+  const [compactRecordPicker, setCompactRecordPicker] = useState(false);
+
+  useEffect(() => {
+    const tabs = recordTabsRef.current;
+    if (!tabs) return;
+
+    const measure = () => setCompactRecordPicker(tabs.scrollWidth > tabs.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(tabs);
+    return () => observer.disconnect();
+  }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -498,32 +663,33 @@ function CaptureConsole() {
             <span>{recordHint(kind)}</span>
           </div>
         </div>
-        <div className="record-mode-tabs" role="tablist" aria-label="Record type">
+        <div ref={recordTabsRef} className={compactRecordPicker ? "record-mode-tabs measure-only" : "record-mode-tabs"} role="tablist" aria-label="Record type">
           {recordModes.map((mode) => (
-            <button key={mode.kind} type="button" className={kind === mode.kind ? "active" : ""} onClick={() => setKind(mode.kind)} title={mode.hint}>
+            <Button key={mode.kind} type="button" className={kind === mode.kind ? "active" : ""} onClick={() => setKind(mode.kind)} title={mode.hint}>
               {recordIcon(mode.kind)}
               <span>{mode.label}</span>
-            </button>
+            </Button>
           ))}
         </div>
+        {compactRecordPicker ? <RecordTypeSelect value={kind} onChange={(value) => setKind(value as MemoryKind)} /> : null}
       </div>
       <div className="capture-top">
         {recordIcon(kind)}
-        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={titlePlaceholder(kind)} />
+        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={titlePlaceholder(kind)} />
       </div>
       <div className="scene-panel">{renderSceneFields()}</div>
-      <textarea className={kind === "chat" ? "chat-textarea" : ""} value={content} onChange={(event) => setContent(event.target.value)} placeholder={contentPlaceholder(kind)} />
+      <Textarea className={kind === "chat" ? "chat-textarea" : ""} value={content} onChange={(event) => setContent(event.target.value)} placeholder={contentPlaceholder(kind)} />
       <div className="capture-bottom">
         <SourceSelect value={kind === "chat" ? "chat" : source} onChange={(value) => setSource(value as MemorySource)} options={sources.filter((item) => item.value !== "all")} />
-        <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="tags: product, mory, research" />
-        <button className="clipboard-action" type="button" onClick={() => void pasteFromClipboard()}>
+        <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="tags: product, mory, research" />
+        <Button variant="secondary" className="clipboard-action" type="button" onClick={() => void pasteFromClipboard()}>
           <Clipboard size={17} />
           Paste
-        </button>
-        <button type="submit">
+        </Button>
+        <Button type="submit">
           {saved ? <Check size={17} /> : <Send size={17} />}
           {saved ? "Saved" : "Capture"}
-        </button>
+        </Button>
       </div>
       {clipboardMessage ? <p className="capture-hint">{clipboardMessage}</p> : null}
     </form>
@@ -537,25 +703,25 @@ function CaptureConsole() {
     if (kind === "bill") {
       return (
         <div className="scene-fields bill-fields">
-          <input value={billAmount} onChange={(event) => setBillAmount(event.target.value)} placeholder="Amount, e.g. 68.90" inputMode="decimal" />
-          <input value={billMerchant} onChange={(event) => setBillMerchant(event.target.value)} placeholder="Merchant or payee" />
-          <input value={billCategory} onChange={(event) => setBillCategory(event.target.value)} placeholder="Category, e.g. food, infra, travel" />
-          <input value={billDate} onChange={(event) => setBillDate(event.target.value)} type="date" />
+          <Input value={billAmount} onChange={(event) => setBillAmount(event.target.value)} placeholder="Amount, e.g. 68.90" inputMode="decimal" />
+          <Input value={billMerchant} onChange={(event) => setBillMerchant(event.target.value)} placeholder="Merchant or payee" />
+          <Input value={billCategory} onChange={(event) => setBillCategory(event.target.value)} placeholder="Category, e.g. food, infra, travel" />
+          <Input value={billDate} onChange={(event) => setBillDate(event.target.value)} type="date" />
         </div>
       );
     }
 
     if (kind === "chat") {
-      return <div className="scene-fields"><input value={chatWith} onChange={(event) => setChatWith(event.target.value)} placeholder="Conversation with / channel / room" /></div>;
+      return <div className="scene-fields"><Input value={chatWith} onChange={(event) => setChatWith(event.target.value)} placeholder="Conversation with / channel / room" /></div>;
     }
 
     if (kind === "finance") {
       return (
         <div className="scene-fields finance-fields">
-          <input value={financeAmount} onChange={(event) => setFinanceAmount(event.target.value)} placeholder="Amount / value" inputMode="decimal" />
-          <input value={financeCurrency} onChange={(event) => setFinanceCurrency(event.target.value.toUpperCase())} placeholder="Currency" />
-          <input value={financeAccount} onChange={(event) => setFinanceAccount(event.target.value)} placeholder="Account / asset / wallet" />
-          <input value={financeType} onChange={(event) => setFinanceType(event.target.value)} placeholder="Type: income, asset, debt, transfer" />
+          <Input value={financeAmount} onChange={(event) => setFinanceAmount(event.target.value)} placeholder="Amount / value" inputMode="decimal" />
+          <Input value={financeCurrency} onChange={(event) => setFinanceCurrency(event.target.value.toUpperCase())} placeholder="Currency" />
+          <Input value={financeAccount} onChange={(event) => setFinanceAccount(event.target.value)} placeholder="Account / asset / wallet" />
+          <Input value={financeType} onChange={(event) => setFinanceType(event.target.value)} placeholder="Type: income, asset, debt, transfer" />
         </div>
       );
     }
@@ -573,8 +739,8 @@ function CaptureConsole() {
               { value: "blocked", label: "Blocked" },
             ]}
           />
-          <input value={taskDue} onChange={(event) => setTaskDue(event.target.value)} type="date" />
-          <input value={taskOwner} onChange={(event) => setTaskOwner(event.target.value)} placeholder="Owner / project" />
+          <Input value={taskDue} onChange={(event) => setTaskDue(event.target.value)} type="date" />
+          <Input value={taskOwner} onChange={(event) => setTaskOwner(event.target.value)} placeholder="Owner / project" />
         </div>
       );
     }
@@ -582,8 +748,8 @@ function CaptureConsole() {
     if (kind === "waiting") {
       return (
         <div className="scene-fields task-fields">
-          <input value={waitingFor} onChange={(event) => setWaitingFor(event.target.value)} placeholder="Waiting for person / event / reply" />
-          <input value={waitingDue} onChange={(event) => setWaitingDue(event.target.value)} type="date" />
+          <Input value={waitingFor} onChange={(event) => setWaitingFor(event.target.value)} placeholder="Waiting for person / event / reply" />
+          <Input value={waitingDue} onChange={(event) => setWaitingDue(event.target.value)} type="date" />
           <InlineSelect
             value={waitingStatus}
             onChange={setWaitingStatus}
@@ -598,14 +764,14 @@ function CaptureConsole() {
     }
 
     if (kind === "bookmark") {
-      return <div className="scene-fields"><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com/page" /></div>;
+      return <div className="scene-fields"><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com/page" /></div>;
     }
 
     if (kind === "file") {
       return (
         <div className="scene-fields task-fields">
-          <input value={fileName} onChange={(event) => setFileName(event.target.value)} placeholder="File name" />
-          <input value={filePath} onChange={(event) => setFilePath(event.target.value)} placeholder="Path, drive URL, or storage location" />
+          <Input value={fileName} onChange={(event) => setFileName(event.target.value)} placeholder="File name" />
+          <Input value={filePath} onChange={(event) => setFilePath(event.target.value)} placeholder="Path, drive URL, or storage location" />
         </div>
       );
     }
@@ -613,7 +779,7 @@ function CaptureConsole() {
     if (kind === "decision") {
       return (
         <div className="scene-fields task-fields">
-          <input value={decisionOwner} onChange={(event) => setDecisionOwner(event.target.value)} placeholder="Owner / team / project" />
+          <Input value={decisionOwner} onChange={(event) => setDecisionOwner(event.target.value)} placeholder="Owner / team / project" />
           <InlineSelect
             value={decisionStatus}
             onChange={setDecisionStatus}
@@ -629,8 +795,8 @@ function CaptureConsole() {
 
     return (
       <div className="scene-fields task-fields">
-        <input value={logDate} onChange={(event) => setLogDate(event.target.value)} type="date" />
-        <input value={logMood} onChange={(event) => setLogMood(event.target.value)} placeholder="Mood, state, metric, or location" />
+        <Input value={logDate} onChange={(event) => setLogDate(event.target.value)} type="date" />
+        <Input value={logMood} onChange={(event) => setLogMood(event.target.value)} placeholder="Mood, state, metric, or location" />
       </div>
     );
   }
@@ -655,7 +821,7 @@ function SourceSelect({
 
   return (
     <div className={open ? "source-select open" : "source-select"}>
-      <button
+      <Button
         type="button"
         className={open ? "source-trigger open" : "source-trigger"}
         onClick={() => setOpen((current) => !current)}
@@ -669,11 +835,11 @@ function SourceSelect({
       >
         <span>{selected.label}</span>
         <ChevronDown size={16} />
-      </button>
+      </Button>
       {open ? (
         <div className="source-menu" role="listbox" tabIndex={-1}>
           {options.map((item) => (
-            <button
+            <Button
               key={item.value}
               type="button"
               role="option"
@@ -684,7 +850,49 @@ function SourceSelect({
             >
               <span>{item.label}</span>
               {item.value === value ? <Check size={15} /> : null}
-            </button>
+            </Button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RecordTypeSelect({ value, onChange }: { value: MemoryKind; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = recordModes.find((item) => item.kind === value) ?? recordModes[0];
+
+  return (
+    <div className={open ? "source-select record-type-select open" : "source-select record-type-select"}>
+      <Button
+        type="button"
+        className={open ? "source-trigger open" : "source-trigger"}
+        onClick={() => setOpen((current) => !current)}
+        onBlur={(event) => {
+          if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setOpen(false);
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Record type"
+      >
+        <span>{selected.label}</span>
+        <ChevronDown size={16} />
+      </Button>
+      {open ? (
+        <div className="source-menu" role="listbox" tabIndex={-1}>
+          {recordModes.map((mode) => (
+            <Button
+              key={mode.kind}
+              type="button"
+              role="option"
+              aria-selected={mode.kind === value}
+              className={mode.kind === value ? "selected" : ""}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => { onChange(mode.kind); setOpen(false); }}
+            >
+              <span>{mode.label}</span>
+              {mode.kind === value ? <Check size={15} /> : null}
+            </Button>
           ))}
         </div>
       ) : null}
@@ -710,10 +918,10 @@ function InlineSelect({
   }
 
   return (
-    <div className={open ? "inline-select open" : "inline-select"}>
-      <button
+    <div className={open ? "source-select inline-select open" : "source-select inline-select"}>
+      <Button
         type="button"
-        className={open ? "inline-trigger open" : "inline-trigger"}
+        className={open ? "source-trigger open" : "source-trigger"}
         onClick={() => setOpen((current) => !current)}
         onBlur={(event) => {
           if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) {
@@ -724,12 +932,12 @@ function InlineSelect({
         aria-expanded={open}
       >
         <span>{selected.label}</span>
-        <ChevronDown size={15} />
-      </button>
+        <ChevronDown size={16} />
+      </Button>
       {open ? (
-        <div className="inline-menu" role="listbox" tabIndex={-1}>
+        <div className="source-menu" role="listbox" tabIndex={-1}>
           {options.map((item) => (
-            <button
+            <Button
               key={item.value}
               type="button"
               role="option"
@@ -739,8 +947,8 @@ function InlineSelect({
               onClick={() => choose(item.value)}
             >
               <span>{item.label}</span>
-              {item.value === value ? <Check size={14} /> : null}
-            </button>
+              {item.value === value ? <Check size={15} /> : null}
+            </Button>
           ))}
         </div>
       ) : null}
@@ -757,22 +965,22 @@ function AdvancedFilters() {
         <SlidersHorizontal size={15} />
         Filters
       </span>
-      <select value={timeRange} onChange={(event) => setTimeRange(event.target.value as typeof timeRange)} title="Filter memories by capture time">
-        <option value="all">Any time</option>
-        <option value="today">Today</option>
-        <option value="week">Last 7 days</option>
-        <option value="month">Last 30 days</option>
-      </select>
-      <select value={privacy} onChange={(event) => setPrivacy(event.target.value as typeof privacy)} title="Filter private or public memories">
-        <option value="all">All visibility</option>
-        <option value="public">Public only</option>
-        <option value="private">Private only</option>
-      </select>
-      <input value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} placeholder="filter tag" title="Filter by tag" />
-      <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} title="Sort memory feed">
-        <option value="newest">Newest first</option>
-        <option value="score">Score first</option>
-      </select>
+      <InlineSelect
+        value={timeRange}
+        onChange={(value) => setTimeRange(value as typeof timeRange)}
+        options={[{ value: "all", label: "Any time" }, { value: "today", label: "Today" }, { value: "week", label: "Last 7 days" }, { value: "month", label: "Last 30 days" }]}
+      />
+      <InlineSelect
+        value={privacy}
+        onChange={(value) => setPrivacy(value as typeof privacy)}
+        options={[{ value: "all", label: "All visibility" }, { value: "public", label: "Public only" }, { value: "private", label: "Private only" }]}
+      />
+      <Input value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} placeholder="filter tag" title="Filter by tag" />
+      <InlineSelect
+        value={sortBy}
+        onChange={(value) => setSortBy(value as typeof sortBy)}
+        options={[{ value: "newest", label: "Newest first" }, { value: "score", label: "Score first" }]}
+      />
     </section>
   );
 }
@@ -791,7 +999,7 @@ function SystemHealth({ stats }: { stats: ReturnType<typeof selectStats> }) {
       </div>
       <div className="mini-signal">
         <Database size={16} />
-        <span>IndexedDB active</span>
+        <span>Repository active</span>
         <Check size={15} />
       </div>
       <TagStack tags={stats.tags} />
@@ -812,10 +1020,10 @@ function CollectionsPanel({ memories }: { memories: MemoryObject[] }) {
       <div className="collection-list">
         {collections.length ? (
           collections.map((collection) => (
-            <button key={collection.tag} type="button" onClick={() => setQuery(collection.tag)}>
+            <Button key={collection.tag} type="button" onClick={() => setQuery(collection.tag)}>
               <span>#{collection.tag}</span>
               <strong>{collection.count}</strong>
-            </button>
+            </Button>
           ))
         ) : (
           <p className="empty-note">Capture or import more memories and Mory will cluster them by tag.</p>
@@ -827,6 +1035,7 @@ function CollectionsPanel({ memories }: { memories: MemoryObject[] }) {
 
 function GithubSyncCard() {
   const { github, updateGithub, mergeGithub, pushGithub, pullGithub, memories } = useMemoryStore();
+  const [backupMessage, setBackupMessage] = useState("");
   const privateCount = memories.filter((memory) => memory.isPrivate).length;
 
   return (
@@ -836,27 +1045,37 @@ function GithubSyncCard() {
         <h3>GitHub Sync</h3>
       </div>
       <div className="sync-grid">
-        <input value={github.owner} onChange={(event) => updateGithub({ owner: event.target.value })} aria-label="GitHub owner" />
-        <input value={github.repo} onChange={(event) => updateGithub({ repo: event.target.value })} aria-label="GitHub repo" />
-        <input value={github.branch} onChange={(event) => updateGithub({ branch: event.target.value })} aria-label="GitHub branch" />
-        <input value={github.path} onChange={(event) => updateGithub({ path: event.target.value })} aria-label="GitHub sync path" />
+        <Input value={github.owner} onChange={(event) => updateGithub({ owner: event.target.value })} aria-label="GitHub owner" />
+        <Input value={github.repo} onChange={(event) => updateGithub({ repo: event.target.value })} aria-label="GitHub repo" />
+        <Input value={github.branch} onChange={(event) => updateGithub({ branch: event.target.value })} aria-label="GitHub branch" />
+        <Input value={github.path} onChange={(event) => updateGithub({ path: event.target.value })} aria-label="GitHub sync path" />
       </div>
-      <input className="token-input" type="password" value={github.token} onChange={(event) => updateGithub({ token: event.target.value })} placeholder="GitHub token with contents read/write" />
+      <Input className="token-input" type="password" value={github.token} onChange={(event) => updateGithub({ token: event.target.value })} placeholder="GitHub token with contents read/write" />
       <div className={privateCount ? "sync-warning" : "sync-note"}>
         {privateCount ? `${privateCount} private memories are included in sync/export unless you remove them first.` : "Token is kept in page state and is not restored after refresh."}
       </div>
       <div className="sync-actions">
-        <button className="primary-action" type="button" onClick={() => void mergeGithub()}>
+        <Button className="primary-action" type="button" onClick={() => void mergeGithub()}>
           <Cloud size={16} />
           Merge sync
-        </button>
-        <button type="button" onClick={() => void pushGithub()} title={`Push ${memories.length} objects`}>
+        </Button>
+        <Button type="button" onClick={() => void pushGithub()} title={`Push ${memories.length} objects`}>
           <ArrowUpToLine size={16} />
-        </button>
-        <button type="button" onClick={() => void pullGithub()} title="Pull remote repository">
+        </Button>
+        <Button type="button" onClick={() => void pullGithub()} title="Pull remote repository">
           <ArrowDownToLine size={16} />
-        </button>
+        </Button>
       </div>
+      <Button className="ghost-button sqlite-backup-button" type="button" onClick={async () => {
+        setBackupMessage("Backing up SQLite...");
+        try {
+          const result = await backupRemoteGithub(github);
+          setBackupMessage("SQLite + JSON committed (" + result.count + " memories).");
+        } catch (error) {
+          setBackupMessage(error instanceof Error ? error.message : "SQLite backup failed.");
+        }
+      }}>Commit SQLite backup</Button>
+      {backupMessage ? <p className="sync-note">{backupMessage}</p> : null}
     </section>
   );
 }
@@ -932,58 +1151,53 @@ function MemoryCard({ memory, selected, onSelect, onOpen }: { memory: MemoryObje
   }
 
   return (
-    <article className={selected ? "memory-card selected" : "memory-card"}>
-      <div className="memory-card-top">
-        <span>{recordLabel(memory.kind)} / {memory.source}</span>
-        <strong>{memory.score}</strong>
+    <Card className={selected ? "memory-card selected" : "memory-card"}>
+      <div className="memory-time">{relativeTime(memory.capturedAt)}</div>
+      <div className="memory-entity">
+        <strong>{memory.actor?.id || memory.source}</strong>
+        <span>{memory.source}</span>
       </div>
+      <div className="memory-content-cell">
       {editing ? (
         <div className="edit-stack">
-          <input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} />
-          <textarea value={draftContent} onChange={(event) => setDraftContent(event.target.value)} />
-          <input value={draftTags} onChange={(event) => setDraftTags(event.target.value)} />
+           <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} />
+           <Textarea value={draftContent} onChange={(event) => setDraftContent(event.target.value)} />
+           <Input value={draftTags} onChange={(event) => setDraftTags(event.target.value)} />
         </div>
       ) : (
         <>
-          <h3>{memory.isPrivate ? "Private memory" : memory.payload.title}</h3>
-          {memory.isPrivate ? null : <ScenePreview memory={memory} />}
+          <Button className="memory-title-button" type="button" onClick={onOpen}>{memory.isPrivate ? "Private memory" : memory.payload.title}</Button>
           <p>{memory.isPrivate ? "This memory is marked private." : memoryPreview(memory) || memory.payload.content}</p>
-          {memory.payload.url ? (
-            <a className="memory-url" href={memory.payload.url} target="_blank" rel="noreferrer">
-              {memory.payload.url}
-            </a>
-          ) : null}
-          <div className="memory-tags">
-            {memory.tags.slice(0, 8).map((tag) => (
-              <button key={tag} type="button" onClick={() => setQuery(tag)}>
-                #{tag}
-              </button>
-            ))}
-          </div>
         </>
       )}
+      </div>
+      <div className="memory-category">
+        <Button type="button" onClick={() => setQuery(memory.kind || "note")}>{memory.kind || "note"}</Button>
+        {memory.tags[0] ? <span>#{memory.tags[0]}</span> : null}
+      </div>
+        <div className="memory-life"><Badge>Active</Badge><strong>{memory.score}</strong></div>
       <div className="card-actions">
-        <label title="Add this memory to the Selection Pack for copying or export">
-          <input type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked)} />
-          Pack
-        </label>
-        <button type="button" onClick={() => (editing ? void saveEdit() : setEditing(true))}>
+        <label title="Add this memory to the Selection Pack for copying or export"><Input type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked)} /> Pack</label>
+        <Button type="button" onClick={() => (editing ? void saveEdit() : setEditing(true))}>
           {editing ? <Check size={15} /> : <Pencil size={15} />}
           {editing ? "Save" : "Edit"}
-        </button>
-        <button type="button" onClick={() => void update({ ...memory, isPrivate: !memory.isPrivate })}>
-          {memory.isPrivate ? "Public" : "Private"}
-        </button>
-        <button type="button" onClick={() => void remove(memory.id)}>
-          <Trash2 size={15} />
-        </button>
+        </Button>
+        <Button type="button" onClick={() => void update({ ...memory, isPrivate: !memory.isPrivate })}>{memory.isPrivate ? "Public" : "Private"}</Button>
+        <Button type="button" onClick={() => void remove(memory.id)}><Trash2 size={15} /></Button>
+        <Button type="button" onClick={onOpen}>Details</Button>
       </div>
-      <footer>
-        <span>{new Date(memory.capturedAt).toLocaleDateString()}</span>
-        <button type="button" onClick={onOpen}>Details</button>
-      </footer>
-    </article>
+    </Card>
   );
+}
+
+function relativeTime(value: string): string {
+  const delta = Math.max(0, Date.now() - new Date(value).getTime());
+  const minutes = Math.floor(delta / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return String(minutes) + "m ago";
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return String(hours) + "h ago";
+  return String(Math.floor(hours / 24)) + "d ago";
 }
 
 function MemoryDetailDrawer({
@@ -1021,24 +1235,24 @@ function MemoryDetailDrawer({
             <span className="eyebrow">Memory Detail</span>
             <h2>{memory.payload.title}</h2>
           </div>
-          <button type="button" onClick={onClose}>Close</button>
+          <Button type="button" onClick={onClose}>Close</Button>
         </header>
         <div className="drawer-grid">
           <label>
             Title
-            <input value={title} onChange={(event) => setTitle(event.target.value)} />
+            <Input value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
           <label>
             URL
-            <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />
+            <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />
           </label>
           <label>
             Tags
-            <input value={tags} onChange={(event) => setTags(event.target.value)} />
+            <Input value={tags} onChange={(event) => setTags(event.target.value)} />
           </label>
           <label>
             Raw memory
-            <textarea value={content} onChange={(event) => setContent(event.target.value)} />
+            <Textarea value={content} onChange={(event) => setContent(event.target.value)} />
           </label>
         </div>
         <section className="drawer-meta">
@@ -1065,22 +1279,22 @@ function MemoryDetailDrawer({
           <p>{createPreview(content)}</p>
         </section>
         <div className="drawer-actions">
-          <button type="button" onClick={() => onSelect(!selected)}>
+          <Button type="button" onClick={() => onSelect(!selected)}>
             <Archive size={15} />
             {selected ? "Remove from Pack" : "Add to Pack"}
-          </button>
-          <button type="button" onClick={() => void update({ ...memory, isPrivate: !memory.isPrivate })}>
+          </Button>
+          <Button type="button" onClick={() => void update({ ...memory, isPrivate: !memory.isPrivate })}>
             <Shield size={15} />
             {memory.isPrivate ? "Make Public" : "Mark Private"}
-          </button>
-          <button type="button" onClick={() => void save()}>
+          </Button>
+          <Button type="button" onClick={() => void save()}>
             <Check size={15} />
             Save
-          </button>
-          <button type="button" onClick={() => { void remove(memory.id); onClose(); }}>
+          </Button>
+          <Button type="button" onClick={() => { void remove(memory.id); onClose(); }}>
             <Trash2 size={15} />
             Delete
-          </button>
+          </Button>
         </div>
       </aside>
     </div>
@@ -1110,12 +1324,12 @@ function ContextPack({ memories, onClear }: { memories: MemoryObject[]; onClear:
         </div>
       </div>
       <div className="context-actions">
-        <select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)} title="Choose pack output format">
-          <option value="compact">Compact</option>
-          <option value="full">Full</option>
-          <option value="archive">Archive</option>
-        </select>
-        <button
+        <InlineSelect
+          value={mode}
+          onChange={(value) => setMode(value as typeof mode)}
+          options={[{ value: "compact", label: "Compact" }, { value: "full", label: "Full" }, { value: "archive", label: "Archive" }]}
+        />
+        <Button
           type="button"
           onClick={() => {
             void navigator.clipboard.writeText(text);
@@ -1126,10 +1340,10 @@ function ContextPack({ memories, onClear }: { memories: MemoryObject[]; onClear:
         >
           {copied ? <Check size={15} /> : <Clipboard size={15} />}
           {copied ? "Copied" : "Copy pack"}
-        </button>
-        <button type="button" onClick={onClear} title="Remove all memories from the current selection pack">
+        </Button>
+        <Button type="button" onClick={onClear} title="Remove all memories from the current selection pack">
           Clear
-        </button>
+        </Button>
       </div>
     </section>
   );
@@ -1161,7 +1375,7 @@ function BookmarkImport() {
     <label className="bookmark-import" title="Import Chrome or Edge exported bookmarks HTML">
       <FileText size={16} />
       Import bookmarks
-      <input type="file" accept=".html,.htm,text/html" onChange={(event) => {
+      <Input type="file" accept=".html,.htm,text/html" onChange={(event) => {
         const file = event.target.files?.[0];
         if (file) {
           void importBookmarks(file);
@@ -1192,7 +1406,7 @@ function TextImport() {
     <label className="bookmark-import" title="Import Markdown or plain text files">
       <Upload size={16} />
       Import text
-      <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={(event) => {
+      <Input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={(event) => {
         const file = event.target.files?.[0];
         if (file) {
           void importText(file);
@@ -1215,10 +1429,10 @@ function JsonExport({ memories }: { memories: MemoryObject[] }) {
   }
 
   return (
-    <button className="ghost-button" type="button" onClick={exportJson} title="Export the local memory repository as JSON">
+    <Button variant="ghost" className="ghost-button" type="button" onClick={exportJson} title="Export the local memory repository as JSON">
       <Download size={16} />
       Export JSON
-    </button>
+    </Button>
   );
 }
 
@@ -1246,10 +1460,10 @@ function TagStack({ tags }: { tags: Array<{ tag: string; count: number }> }) {
   return (
     <div className="tag-stack">
       {tags.slice(0, 6).map((tag) => (
-        <button key={tag.tag} type="button" onClick={() => setQuery(tag.tag)}>
+        <Button key={tag.tag} type="button" onClick={() => setQuery(tag.tag)}>
           #{tag.tag}
           <span>{tag.count}</span>
-        </button>
+        </Button>
       ))}
     </div>
   );

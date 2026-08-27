@@ -43,9 +43,10 @@ Connector Event
 
 ## Storage Plan
 
-The browser MVP currently uses Dexie and IndexedDB. The complete repository should split storage responsibilities:
+The API repository now uses SQLite as its shared source of truth. The browser can still use Dexie when no API token is configured. The complete repository should split storage responsibilities:
 
-- IndexedDB: MemoryObject metadata, event log, indexes, sync cursors.
+- SQLite: memories, raw events, history, FTS5 index, entities, relations, and embeddings.
+- IndexedDB: optional offline/browser-only MemoryObject metadata and sync cursors.
 - OPFS: large raw files, attachments, imported PDFs, chunk payloads.
 - Content hash: deduplication and immutable object identity.
 - Tombstones: deletion intent without rewriting historical commits.
@@ -53,7 +54,7 @@ The browser MVP currently uses Dexie and IndexedDB. The complete repository shou
 
 ## Sync Plan
 
-GitHub sync in the MVP writes one JSON file. That is useful for validation, but not the final protocol.
+GitHub backup writes both the SQLite database and a readable JSON snapshot. SQLite is the runtime source of truth; GitHub is a versioned backup target.
 
 The mature sync package should use chunked objects:
 
