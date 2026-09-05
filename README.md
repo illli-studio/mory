@@ -333,7 +333,7 @@ browser keeps a local IndexedDB cache and GitHub stores the durable
 Use these Cloudflare Pages settings:
 
 ```text
-Build command: pnpm --filter @mory/web build
+Build command: pnpm build
 Build output directory: apps/web/dist
 ```
 
