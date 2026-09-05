@@ -4213,8 +4213,9 @@ body { overflow-x: hidden; }
 }
 
 @media (min-width: 1181px) {
+  .settings-content { max-width: 100%; }
   .theme-panel { max-width: none; }
-  .theme-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .theme-options { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 /* Keep the theme readable across the older, more specific product rules. */
