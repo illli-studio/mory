@@ -7350,3 +7350,19 @@ body { overflow-x: hidden; }
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
+
+/* Header controls must stay dark when any dark workspace palette is active. */
+:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="terminal"], [data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .header-settings[data-slot="button"],
+:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="terminal"], [data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .header-actions > .status-chip {
+  background: var(--surface-muted) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="terminal"], [data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .header-settings[data-slot="button"]:hover,
+:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="terminal"], [data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .header-settings[data-slot="button"][aria-pressed="true"],
+:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="terminal"], [data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .header-actions > .status-chip:hover {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--bg) !important;
+}
