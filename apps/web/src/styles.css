@@ -7222,3 +7222,24 @@ body { overflow-x: hidden; }
   background: color-mix(in srgb, var(--surface-muted) 94%, var(--accent)) !important;
   border-color: var(--border) !important;
 }
+
+/* Let the desktop theme selector use the full settings canvas. */
+@media (min-width: 1181px) {
+  .settings-page-header,
+  .settings-page > [data-slot="tabs"],
+  .settings-page > .settings-tabs,
+  .settings-page > .settings-select,
+  .settings-content {
+    width: 100%;
+    max-width: none;
+  }
+
+  .theme-panel {
+    width: 100%;
+    max-width: none;
+  }
+
+  .theme-options {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
