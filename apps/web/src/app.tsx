@@ -136,7 +136,10 @@ export function App() {
         </div>
         <div className="header-actions">
           <Button variant="ghost" className="header-settings" type="button" onClick={() => toggleUtilityPanel("github")} aria-pressed={activeUtilityPanel !== null}>
-            <SlidersHorizontal size={16} />
+            <span className="header-settings-icon" aria-hidden="true">
+              <SlidersHorizontal size={16} />
+              {!syncConfigured ? <span className="header-settings-help">?</span> : null}
+            </span>
             <span>{t("settings")}</span>
           </Button>
           <StatusChip status={syncStatus} label={`${t(`sync${syncStatus[0].toUpperCase()}${syncStatus.slice(1)}` as TranslationKey)} · ${stats.total} ${t("objectCount")}`} />

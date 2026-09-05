@@ -6855,6 +6855,62 @@ body { overflow-x: hidden; }
   .page-navigation > span { min-width: 46px; }
 }
 
+.header-settings-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.header-settings-help {
+  position: absolute;
+  top: -8px;
+  right: -9px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* The help badge belongs to the whole settings button, not the slider icon. */
+.header-settings[data-slot="button"] {
+  position: relative;
+}
+
+.header-settings-icon {
+  position: static;
+}
+
+.header-settings-help {
+  top: -7px;
+  right: -7px;
+}
+
+/* Small-screen text compression must not hide the icon wrapper. */
+.header-settings .header-settings-icon {
+  display: inline-grid !important;
+}
+
+.header-settings .header-settings-help {
+  display: grid !important;
+}
+
+@media (max-width: 520px) {
+  .header-settings-help {
+    top: -7px;
+    right: -7px;
+  }
+}
+
 /* Capture actions: source, paste, and save share one row on small screens. */
 @media (max-width: 600px) {
   .capture-modal .capture-bottom {
