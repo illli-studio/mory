@@ -4133,6 +4133,36 @@ body { overflow-x: hidden; }
   --shadow-soft: 0 14px 40px rgba(0,0,0,.09); --shadow-menu: 0 18px 48px rgba(0,0,0,.14);
 }
 
+[data-theme="abyss"] {
+  --bg: #080b12; --surface: #101722; --surface-muted: #151f2f; --surface-raised: rgba(18,26,41,.98);
+  --border: #293b56; --border-soft: #1e2d43; --text: #edf4ff; --muted: #8fa5c2; --accent: #6ea8ff; --primary-hover: #4d82d4;
+  --shadow-soft: 0 14px 40px rgba(0,0,0,.34); --shadow-menu: 0 18px 48px rgba(0,0,0,.48);
+}
+
+[data-theme="ember"] {
+  --bg: #160d0b; --surface: #211413; --surface-muted: #2b1815; --surface-raised: rgba(46,25,21,.98);
+  --border: #61352a; --border-soft: #46251f; --text: #fff1e8; --muted: #c39a89; --accent: #ff9b6b; --primary-hover: #dc7449;
+  --shadow-soft: 0 14px 40px rgba(0,0,0,.34); --shadow-menu: 0 18px 48px rgba(0,0,0,.48);
+}
+
+[data-theme="aurora"] {
+  --bg: #071517; --surface: #0c2427; --surface-muted: #123336; --surface-raised: rgba(15,49,52,.98);
+  --border: #245c5d; --border-soft: #194849; --text: #e8fffb; --muted: #8dc8c1; --accent: #64e8d2; --primary-hover: #35b9a5;
+  --shadow-soft: 0 14px 40px rgba(0,0,0,.34); --shadow-menu: 0 18px 48px rgba(0,0,0,.48);
+}
+
+[data-theme="violet"] {
+  --bg: #110d1d; --surface: #1b142b; --surface-muted: #261a39; --surface-raised: rgba(40,27,59,.98);
+  --border: #5c4380; --border-soft: #402d5e; --text: #f8f0ff; --muted: #b39bc9; --accent: #c59bff; --primary-hover: #9f73db;
+  --shadow-soft: 0 14px 40px rgba(0,0,0,.34); --shadow-menu: 0 18px 48px rgba(0,0,0,.48);
+}
+
+[data-theme="navy"] {
+  --bg: #091323; --surface: #101d34; --surface-muted: #162746; --surface-raised: rgba(22,39,70,.98);
+  --border: #304e78; --border-soft: #223b60; --text: #edf5ff; --muted: #9ab0d1; --accent: #7fb3ff; --primary-hover: #568bd8;
+  --shadow-soft: 0 14px 40px rgba(0,0,0,.34); --shadow-menu: 0 18px 48px rgba(0,0,0,.48);
+}
+
 [data-theme="midnight"] body,
 [data-theme="ocean"] body,
 [data-theme="sunset"] body,
@@ -4141,7 +4171,12 @@ body { overflow-x: hidden; }
 [data-theme="graphite"] body,
 [data-theme="rose"] body,
 [data-theme="terminal"] body,
-[data-theme="sand"] body {
+[data-theme="sand"] body,
+[data-theme="abyss"] body,
+[data-theme="ember"] body,
+[data-theme="aurora"] body,
+[data-theme="violet"] body,
+[data-theme="navy"] body {
   background: var(--bg);
 }
 
@@ -4168,6 +4203,11 @@ body { overflow-x: hidden; }
 [data-theme="mint"] .product-shell { background: radial-gradient(circle at 8% -8%, rgba(155,234,211,.55), transparent 28%), linear-gradient(180deg,#fff 0%,var(--bg) 48%,#def3eb 100%); }
 [data-theme="copper"] .product-shell { background: radial-gradient(circle at 8% -8%, rgba(250,190,149,.55), transparent 28%), linear-gradient(180deg,#fffdfb 0%,var(--bg) 48%,#f9e6d8 100%); }
 [data-theme="mono"] .product-shell { background: linear-gradient(180deg,#fff 0%,var(--bg) 48%,#e8e8e8 100%); }
+[data-theme="abyss"] .product-shell { background: radial-gradient(circle at 8% -8%, rgba(110,168,255,.16), transparent 28%), linear-gradient(180deg,#101722 0%,var(--bg) 48%,#05070c 100%); }
+[data-theme="ember"] .product-shell { background: radial-gradient(circle at 8% -8%, rgba(255,155,107,.16), transparent 28%), linear-gradient(180deg,#211413 0%,var(--bg) 48%,#0b0706 100%); }
+[data-theme="aurora"] .product-shell { background: radial-gradient(circle at 8% -8%, rgba(100,232,210,.16), transparent 28%), linear-gradient(180deg,#0c2427 0%,var(--bg) 48%,#040a0b 100%); }
+[data-theme="violet"] .product-shell { background: radial-gradient(circle at 8% -8%, rgba(197,155,255,.16), transparent 28%), linear-gradient(180deg,#1b142b 0%,var(--bg) 48%,#08060e 100%); }
+[data-theme="navy"] .product-shell { background: radial-gradient(circle at 8% -8%, rgba(127,179,255,.16), transparent 28%), linear-gradient(180deg,#101d34 0%,var(--bg) 48%,#050a14 100%); }
 
 .theme-panel {
   max-width: 760px;
@@ -7221,6 +7261,73 @@ body { overflow-x: hidden; }
 [data-theme="sand"] .sync-security-section {
   background: color-mix(in srgb, var(--surface-muted) 94%, var(--accent)) !important;
   border-color: var(--border) !important;
+}
+
+/* The additional dark palettes share the same complete dark-surface treatment. */
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .workspace-nav,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .feed-section,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-page {
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  border-color: var(--border) !important;
+  color: var(--text);
+}
+
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .theme-panel,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .theme-option,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .ui-dialog-content,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .capture-modal,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .memory-grid,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .memory-list-header,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .memory-card {
+  background: var(--surface) !important;
+  border-color: var(--border-soft) !important;
+  color: var(--text);
+}
+
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .search-input,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .ui-select-trigger,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) [data-slot="input"],
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) [data-slot="textarea"],
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) [data-slot="button"][data-variant="outline"],
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) [data-slot="button"][data-variant="secondary"] {
+  background: var(--surface-muted) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-page-header h1,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-page-header p,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-page .card-title h3,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .theme-option-copy strong {
+  color: var(--text) !important;
+}
+
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-page-header p,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .theme-option-copy small,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .sync-note {
+  color: var(--muted) !important;
+}
+
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-tabs button {
+  background: var(--surface-muted) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-tabs button.active,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .settings-tabs button:hover {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--bg) !important;
+}
+
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .sync-config-section,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .sync-security-section,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .sync-auto-option,
+:is([data-theme="abyss"], [data-theme="ember"], [data-theme="aurora"], [data-theme="violet"], [data-theme="navy"]) .sync-warning {
+  background: var(--surface-muted) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
 }
 
 /* Let the desktop theme selector use the full settings canvas. */

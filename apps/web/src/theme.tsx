@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-export type ThemeId = "default" | "midnight" | "ocean" | "sunset" | "forest" | "lavender" | "graphite" | "rose" | "terminal" | "sand" | "cobalt" | "plum" | "mint" | "copper" | "mono";
+export type ThemeId = "default" | "midnight" | "ocean" | "sunset" | "forest" | "lavender" | "graphite" | "rose" | "terminal" | "sand" | "cobalt" | "plum" | "mint" | "copper" | "mono" | "abyss" | "ember" | "aurora" | "violet" | "navy";
 
 export const themes: Array<{ id: ThemeId; name: string; description: string; swatches: string[] }> = [
   { id: "default", name: "Default", description: "Calm repository green", swatches: ["#1f6b58", "#f1f3f2", "#ffffff"] },
@@ -18,6 +18,11 @@ export const themes: Array<{ id: ThemeId; name: string; description: string; swa
   { id: "mint", name: "Mint", description: "Fresh lightweight clarity", swatches: ["#138a78", "#eafaf5", "#ffffff"] },
   { id: "copper", name: "Copper", description: "Crafted warm contrast", swatches: ["#b65c35", "#fff2e9", "#fffdfb"] },
   { id: "mono", name: "Mono", description: "Quiet black and white", swatches: ["#333333", "#f3f3f3", "#ffffff"] },
+  { id: "abyss", name: "Abyss", description: "Deep blue-black focus", swatches: ["#6ea8ff", "#080b12", "#121a29"] },
+  { id: "ember", name: "Ember", description: "Warm firelit workspace", swatches: ["#ff9b6b", "#160d0b", "#2b1815"] },
+  { id: "aurora", name: "Aurora", description: "Teal light in the dark", swatches: ["#64e8d2", "#071517", "#123336"] },
+  { id: "violet", name: "Violet", description: "Deep creative night", swatches: ["#c59bff", "#110d1d", "#261a39"] },
+  { id: "navy", name: "Navy", description: "Clear midnight blue", swatches: ["#7fb3ff", "#091323", "#162746"] },
 ];
 
 type ThemeContextValue = { theme: ThemeId; setTheme: (theme: ThemeId) => void };
