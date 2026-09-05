@@ -293,17 +293,19 @@ export function App() {
           />
         ))}
         </div>
-        <nav className="memory-pagination" aria-label="Pagination">
-          <div className="page-size-options">
-            <span>{t("pageSize")}</span>
-            {[10, 20, 50].map((size) => <Button key={size} variant={pageSize === size ? "default" : "outline"} type="button" onClick={() => onPageSizeChange(size)} aria-pressed={pageSize === size}>{size}</Button>)}
-          </div>
-          <div className="page-navigation">
-            <Button variant="outline" type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1} aria-label={t("previousPage")}>‹</Button>
-            <span>{page} {t("pageOf")} {totalPages}</span>
-            <Button variant="outline" type="button" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} aria-label={t("nextPage")}>›</Button>
-          </div>
-        </nav>
+        {memories.length >= 10 ? (
+          <nav className="memory-pagination" aria-label="Pagination">
+            <div className="page-size-options">
+              <span>{t("pageSize")}</span>
+              {[10, 20, 50].map((size) => <Button key={size} variant={pageSize === size ? "default" : "outline"} type="button" onClick={() => onPageSizeChange(size)} aria-pressed={pageSize === size}>{size}</Button>)}
+            </div>
+            <div className="page-navigation">
+              <Button variant="outline" type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1} aria-label={t("previousPage")}>‹</Button>
+              <span>{page} {t("pageOf")} {totalPages}</span>
+              <Button variant="outline" type="button" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} aria-label={t("nextPage")}>›</Button>
+            </div>
+          </nav>
+        ) : null}
       </>
     );
   }
