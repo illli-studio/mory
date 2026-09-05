@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-export type ThemeId = "default" | "midnight" | "ocean" | "sunset" | "forest" | "lavender" | "graphite" | "rose" | "terminal" | "sand" | "cobalt" | "plum" | "mint" | "copper" | "mono" | "abyss" | "ember" | "aurora" | "violet" | "navy";
+export type ThemeId = "default" | "midnight" | "ocean" | "sunset" | "forest" | "lavender" | "graphite" | "rose" | "terminal" | "sand" | "cobalt" | "plum" | "mint" | "copper" | "mono" | "abyss" | "ember" | "aurora" | "violet" | "navy" | "crimson" | "sapphire" | "moss" | "solar" | "ink";
 
 export const themes: Array<{ id: ThemeId; name: string; description: string; swatches: string[] }> = [
   { id: "default", name: "Default", description: "Calm repository green", swatches: ["#1f6b58", "#f1f3f2", "#ffffff"] },
@@ -23,6 +23,11 @@ export const themes: Array<{ id: ThemeId; name: string; description: string; swa
   { id: "aurora", name: "Aurora", description: "Teal light in the dark", swatches: ["#64e8d2", "#071517", "#123336"] },
   { id: "violet", name: "Violet", description: "Deep creative night", swatches: ["#c59bff", "#110d1d", "#261a39"] },
   { id: "navy", name: "Navy", description: "Clear midnight blue", swatches: ["#7fb3ff", "#091323", "#162746"] },
+  { id: "crimson", name: "Crimson", description: "Bold dark red focus", swatches: ["#ff7187", "#1b0b12", "#32131e"] },
+  { id: "sapphire", name: "Sapphire", description: "Deep blue clarity", swatches: ["#61b7ff", "#07111f", "#102844"] },
+  { id: "moss", name: "Moss", description: "Grounded green shadow", swatches: ["#a7d36f", "#0c160f", "#1a2c1b"] },
+  { id: "solar", name: "Solar", description: "Golden light after dark", swatches: ["#ffd166", "#17120a", "#302516"] },
+  { id: "ink", name: "Ink", description: "Minimal editorial black", swatches: ["#e4e7ec", "#0d0f12", "#1c2026"] },
 ];
 
 type ThemeContextValue = { theme: ThemeId; setTheme: (theme: ThemeId) => void };
