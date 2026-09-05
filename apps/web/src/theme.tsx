@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-export type ThemeId = "default" | "midnight" | "ocean" | "sunset" | "forest" | "lavender" | "graphite" | "rose" | "terminal" | "sand";
+export type ThemeId = "default" | "midnight" | "ocean" | "sunset" | "forest" | "lavender" | "graphite" | "rose" | "terminal" | "sand" | "cobalt" | "plum" | "mint" | "copper" | "mono";
 
 export const themes: Array<{ id: ThemeId; name: string; description: string; swatches: string[] }> = [
   { id: "default", name: "Default", description: "Calm repository green", swatches: ["#1f6b58", "#f1f3f2", "#ffffff"] },
@@ -13,6 +13,11 @@ export const themes: Array<{ id: ThemeId; name: string; description: string; swa
   { id: "rose", name: "Rose", description: "Warm editorial blush", swatches: ["#b44968", "#fff1f4", "#ffffff"] },
   { id: "terminal", name: "Terminal", description: "High-contrast green glow", swatches: ["#63e6be", "#07130f", "#0d2119"] },
   { id: "sand", name: "Sand", description: "Quiet paper workspace", swatches: ["#8a5a2b", "#faf4e8", "#fffdf7"] },
+  { id: "cobalt", name: "Cobalt", description: "Electric blue focus", swatches: ["#3f63d8", "#eef2ff", "#ffffff"] },
+  { id: "plum", name: "Plum", description: "Rich evening editorial", swatches: ["#914b8b", "#fbf0fa", "#ffffff"] },
+  { id: "mint", name: "Mint", description: "Fresh lightweight clarity", swatches: ["#138a78", "#eafaf5", "#ffffff"] },
+  { id: "copper", name: "Copper", description: "Crafted warm contrast", swatches: ["#b65c35", "#fff2e9", "#fffdfb"] },
+  { id: "mono", name: "Mono", description: "Quiet black and white", swatches: ["#333333", "#f3f3f3", "#ffffff"] },
 ];
 
 type ThemeContextValue = { theme: ThemeId; setTheme: (theme: ThemeId) => void };
