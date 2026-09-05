@@ -7139,3 +7139,45 @@ body { overflow-x: hidden; }
   border-color: var(--border-soft) !important;
   color: var(--text) !important;
 }
+
+/* Sync settings contain their own nested cards and need the active palette too. */
+[data-theme="graphite"] .sync-config-section,
+[data-theme="graphite"] .sync-security-section,
+[data-theme="terminal"] .sync-config-section,
+[data-theme="terminal"] .sync-security-section {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 96%, var(--accent)), var(--surface)) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="graphite"] .sync-auto-option,
+[data-theme="terminal"] .sync-auto-option,
+[data-theme="graphite"] .sync-note,
+[data-theme="terminal"] .sync-note,
+[data-theme="graphite"] .sync-warning,
+[data-theme="terminal"] .sync-warning {
+  background: var(--surface-muted) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="graphite"] .sync-field > span,
+[data-theme="terminal"] .sync-field > span,
+[data-theme="graphite"] .sync-config-section .language-field > span,
+[data-theme="terminal"] .sync-config-section .language-field > span,
+[data-theme="graphite"] .sync-auto-option small,
+[data-theme="terminal"] .sync-auto-option small {
+  color: var(--muted) !important;
+}
+
+[data-theme="forest"] .sync-config-section,
+[data-theme="forest"] .sync-security-section,
+[data-theme="lavender"] .sync-config-section,
+[data-theme="lavender"] .sync-security-section,
+[data-theme="rose"] .sync-config-section,
+[data-theme="rose"] .sync-security-section,
+[data-theme="sand"] .sync-config-section,
+[data-theme="sand"] .sync-security-section {
+  background: color-mix(in srgb, var(--surface-muted) 94%, var(--accent)) !important;
+  border-color: var(--border) !important;
+}
