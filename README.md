@@ -323,6 +323,29 @@ Available tools are `mory_remember`, `mory_search`, `mory_context`, `mory_get`, 
 
 The GitHub Sync panel can commit both `mory/mory.sqlite` and a readable `mory/memories.json` snapshot. GitHub is a versioned backup target; the running SQLite file remains the source of truth.
 
+## Deploy the web app to Cloudflare Pages
+
+The web app can also run as a static GitHub-backed memory viewer/editor. This
+mode does not require `mory start`, Node.js, or a Cloudflare database: the
+browser keeps a local IndexedDB cache and GitHub stores the durable
+`mory/memories.json` snapshot.
+
+Use these Cloudflare Pages settings:
+
+```text
+Build command: pnpm --filter @mory/web build
+Build output directory: apps/web/dist
+```
+
+After deployment, open the Memory Sync settings, enter a fine-grained GitHub
+token with Contents read/write access to the selected repository, and choose
+the repository containing the memory file. The token is kept in that browser's
+local storage; it is not part of the deployed site. Never commit a token to
+the repository or expose it in build-time environment variables.
+
+The local npm package remains the full local-first mode with SQLite, CLI, and
+MCP. Cloudflare Pages is the lightweight web-only mode.
+
 ---
 
 # Our Belief

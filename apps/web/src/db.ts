@@ -25,12 +25,12 @@ async function getRuntime() {
   if (!current) return undefined;
   return window.location.port === "5173" ? { ...current, apiUrl: window.location.origin } : current;
 }
-function isPackagedRuntime() {
-  return typeof window !== "undefined" && window.location.port !== "5173";
-}
 async function hasApiRuntime() {
   const current = await getRuntime();
-  if (!current && isPackagedRuntime()) throw new Error("Mory API is unavailable. Start the Mory service and refresh this page.");
+  // A deployed static build intentionally has no Mory API. In that case the
+  // browser database is the local cache and GitHub sync remains the durable
+  // store. Keep the API check only as a routing decision, not as a hard
+  // requirement, so the same build works on Cloudflare Pages and locally.
   return current;
 }
 function fromApi(item: ApiMemory): MemoryObject { return { id: item.id, type: "raw", source: ["clipboard", "browser", "file", "chat", "github", "manual"].includes(item.source) ? item.source as MemoryObject["source"] : "manual", capturedAt: item.createdAt, updatedAt: item.updatedAt, contentHash: item.hash, payload: { title: item.title, content: item.text }, kind: item.kind as MemoryObject["kind"], fields: Object.fromEntries(Object.entries(item.metadata || {}).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value))) as MemoryObject["fields"], tags: item.tags || [], score: 50, preview: item.text.slice(0, 180), schemaVersion: 1 }; }
