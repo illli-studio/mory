@@ -3706,6 +3706,244 @@ body {
   box-shadow: 0 4px 12px rgba(25, 28, 35, 0.05);
 }
 
+/* Absolute last-resort viewport rules. */
+html, body, #root,
+.product-shell, .product-header, .workspace-layout, .workspace-main,
+.feed-section, .settings-page, .feed-controls, .memory-grid, .memory-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body { overflow-x: hidden; }
+
+@media (max-width: 1180px) {
+  .workspace-layout { display: block; }
+  .workspace-nav { display: none !important; }
+  .workspace-main { width: 100%; }
+}
+
+@media (max-width: 900px) {
+  .feed-controls {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(132px, .45fr) !important;
+    gap: 8px;
+    overflow: visible;
+  }
+  .feed-controls .command-bar { display: contents !important; }
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger { grid-column: 1 / -1 !important; }
+  .feed-controls .advanced-filters {
+    display: grid !important;
+    grid-column: 1 / -1 !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .feed-controls .advanced-filters > span { display: none; }
+  .feed-controls .advanced-filters > * {
+    grid-column: auto !important;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .product-shell { padding: 8px 8px 20px; }
+  .product-header { display: flex; gap: 10px; }
+  .header-actions { max-width: none; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
+  .brand-lockup, .brand-lockup > div:last-child { min-width: 0; }
+  .brand-lockup span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-section { padding: 12px; border-radius: 16px; }
+  .section-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-heading > div:first-child { grid-column: 1; }
+  .section-heading > .feed-actions { grid-column: 2; grid-row: 1; margin-left: 0; }
+  .section-heading > .context-pack { grid-column: 1 / -1; grid-row: 2; margin-left: 0; }
+  .feed-controls { grid-template-columns: 1fr !important; gap: 8px; padding: 8px; }
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters { grid-column: 1 / -1 !important; }
+  .feed-controls .advanced-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .memory-card {
+    grid-template-columns: 28px minmax(0, 1fr) auto !important;
+    gap: 8px 10px;
+    padding: 12px;
+  }
+  .memory-card .memory-time { grid-column: 2 !important; }
+  .memory-card .memory-entity { grid-column: 3 !important; justify-items: end; }
+  .memory-content-cell, .memory-category, .memory-life,
+  .memory-card .card-actions { grid-column: 1 / -1 !important; }
+  .settings-page { padding: 18px 14px 28px; }
+  .settings-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .settings-tabs::-webkit-scrollbar { display: none; }
+}
+
+@media (max-width: 600px) {
+  .capture-modal {
+    width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px) !important;
+    overflow-y: auto;
+    padding: 16px !important;
+  }
+  .capture-modal .capture-bottom {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .capture-modal .capture-bottom > * { width: 100% !important; min-width: 0 !important; }
+  .capture-modal .capture-bottom > [data-slot="input"] { grid-column: 1 / -1; }
+}
+
+@media (max-width: 420px) {
+  .brand-glyph.logo-mark, .product-header .brand-glyph.logo-mark { width: 42px; height: 42px; }
+  .brand-lockup strong { font-size: 16px; }
+  .brand-lockup span { max-width: 128px; }
+  .section-heading h2 { font-size: 22px; }
+  .feed-controls .advanced-filters { grid-template-columns: 1fr; }
+  .context-actions { flex-wrap: wrap; }
+}
+
+/* Final responsive overrides. Keep these last: older breakpoint rules above
+   are preserved for desktop styling, while small screens get one stable
+   stacking model. */
+html,
+body,
+#root,
+.product-shell,
+.product-header,
+.workspace-layout,
+.workspace-main,
+.feed-section,
+.settings-page,
+.feed-controls,
+.memory-grid,
+.memory-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body { overflow-x: hidden; }
+
+.memory-card > *,
+.memory-content-cell,
+.memory-content-cell p,
+.memory-title-button,
+.memory-entity,
+.memory-category,
+.memory-life,
+.card-actions {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  .workspace-layout { display: block; }
+  .workspace-nav { display: none !important; }
+  .workspace-main { width: 100%; }
+}
+
+@media (max-width: 900px) {
+  .feed-controls {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.45fr) !important;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .feed-controls .command-bar { display: contents !important; }
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger { grid-column: 1 / -1 !important; }
+  .feed-controls .advanced-filters {
+    display: grid !important;
+    grid-column: 1 / -1 !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .feed-controls .advanced-filters > span { display: none; }
+  .feed-controls .advanced-filters > * {
+    grid-column: auto !important;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .product-shell { padding: 8px 8px 20px; }
+  .product-header { display: flex; gap: 10px; }
+  .header-actions { max-width: none; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
+  .brand-lockup, .brand-lockup > div:last-child { min-width: 0; }
+  .brand-lockup span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .feed-section { padding: 12px; border-radius: 16px; }
+  .section-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-heading > div:first-child { grid-column: 1; }
+  .section-heading > .feed-actions { grid-column: 2; grid-row: 1; margin-left: 0; }
+  .section-heading > .context-pack { grid-column: 1 / -1; grid-row: 2; margin-left: 0; }
+
+  .feed-controls {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+    padding: 8px;
+  }
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters { grid-column: 1 / -1 !important; }
+  .feed-controls .advanced-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .memory-card {
+    grid-template-columns: 28px minmax(0, 1fr) auto !important;
+    gap: 8px 10px;
+    padding: 12px;
+  }
+  .memory-card .memory-time { grid-column: 2 !important; }
+  .memory-card .memory-entity { grid-column: 3 !important; justify-items: end; }
+  .memory-content-cell,
+  .memory-category,
+  .memory-life,
+  .memory-card .card-actions { grid-column: 1 / -1 !important; }
+
+  .settings-page { padding: 18px 14px 28px; }
+  .settings-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .settings-tabs::-webkit-scrollbar { display: none; }
+}
+
+@media (max-width: 600px) {
+  .capture-modal {
+    width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px) !important;
+    overflow-y: auto;
+    padding: 16px !important;
+  }
+  .capture-modal .capture-bottom {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .capture-modal .capture-bottom > * { width: 100% !important; min-width: 0 !important; }
+  .capture-modal .capture-bottom > [data-slot="input"] { grid-column: 1 / -1; }
+}
+
+@media (max-width: 420px) {
+  .brand-glyph.logo-mark,
+  .product-header .brand-glyph.logo-mark { width: 42px; height: 42px; }
+  .brand-lockup strong { font-size: 16px; }
+  .brand-lockup span { max-width: 128px; }
+  .section-heading h2 { font-size: 22px; }
+  .feed-controls .advanced-filters { grid-template-columns: 1fr; }
+  .context-actions { flex-wrap: wrap; }
+  .context-actions .inline-trigger,
+  .context-actions > [data-slot="button"] { flex: 1 1 auto; }
+}
+
 @media (min-width: 900px) {
   .feed-controls {
     grid-template-columns: minmax(0, 1fr) 160px 150px 176px 176px !important;
@@ -4391,6 +4629,10 @@ body {
   .feed-controls .command-bar,
   .feed-controls .advanced-filters {
     display: contents !important;
+  }
+
+  .feed-controls .advanced-filters > * {
+    grid-column: auto !important;
   }
 
   .feed-controls .search-input,
@@ -5672,10 +5914,363 @@ body {
     min-width: 0;
   }
 
-  .capture-modal .capture-bottom > button {
+.capture-modal .capture-bottom > button {
     width: 100% !important;
     min-width: 0;
     padding-inline: 6px;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Responsive stability layer
+
+   The stylesheet above contains several historical layout passes. These
+   rules are intentionally kept last so every viewport has one predictable
+   layout contract: children may shrink, controls may wrap, and no component
+   is allowed to create page-level horizontal overflow.
+   ------------------------------------------------------------------------- */
+
+html,
+body,
+#root {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.product-shell,
+.product-header,
+.workspace-layout,
+.workspace-main,
+.feed-section,
+.settings-page,
+.feed-section > *,
+.settings-page > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.section-heading,
+.feed-controls,
+.memory-pagination,
+.settings-page-header,
+.sync-actions,
+.repository-connect-row {
+  min-width: 0;
+}
+
+.section-heading > *,
+.feed-controls > *,
+.memory-card > *,
+.settings-page-header > * {
+  min-width: 0;
+}
+
+.memory-content-cell,
+.memory-content-cell p,
+.memory-title-button,
+.memory-entity,
+.memory-category,
+.memory-life,
+.card-actions {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  .product-shell {
+    padding-inline: clamp(10px, 2vw, 20px);
+  }
+
+  .workspace-layout {
+    display: block;
+  }
+
+  .workspace-nav {
+    display: none !important;
+  }
+
+  .workspace-main {
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .product-header {
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    max-width: 55%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .feed-controls {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.45fr) !important;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .feed-controls .command-bar,
+  .feed-controls .advanced-filters {
+    display: contents !important;
+  }
+
+  .feed-controls .search-input {
+    grid-column: 1 / -1 !important;
+  }
+
+  .feed-controls .command-bar > .source-trigger {
+    grid-column: 1 / -1 !important;
+  }
+
+  .feed-controls .advanced-filters {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .feed-controls .advanced-filters > span {
+    display: none;
+  }
+
+  .feed-controls .advanced-filters > * {
+    grid-column: auto !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .memory-grid {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 760px) {
+  .product-shell {
+    padding: 8px 8px 20px;
+  }
+
+  .product-header {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .brand-lockup {
+    min-width: 0;
+  }
+
+  .brand-lockup > div:last-child {
+    min-width: 0;
+  }
+
+  .brand-lockup span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    max-width: none;
+    flex: 0 0 auto;
+  }
+
+  .feed-section {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .section-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-heading > div:first-child {
+    grid-column: 1;
+  }
+
+  .section-heading > .context-pack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-left: 0;
+  }
+
+  .section-heading > .feed-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .section-heading .feed-actions {
+    width: auto;
+    flex-wrap: nowrap;
+  }
+
+  .feed-capture-button {
+    max-width: 100%;
+    padding-inline: 12px;
+  }
+
+  .feed-controls {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters {
+    grid-column: 1 / -1 !important;
+  }
+
+  .feed-controls .advanced-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .memory-card {
+    grid-template-columns: 28px minmax(0, 1fr) auto !important;
+    gap: 8px 10px;
+    padding: 12px;
+  }
+
+  .memory-card .memory-time {
+    grid-column: 2 !important;
+  }
+
+  .memory-card .memory-entity {
+    grid-column: 3 !important;
+    justify-items: end;
+  }
+
+  .memory-content-cell,
+  .memory-category,
+  .memory-life,
+  .memory-card .card-actions {
+    grid-column: 1 / -1 !important;
+  }
+
+  .memory-pagination {
+    gap: 10px;
+  }
+
+  .settings-page {
+    padding: 18px 14px 28px;
+  }
+
+  .settings-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .capture-modal {
+    width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px) !important;
+    overflow-y: auto;
+    padding: 16px !important;
+  }
+
+  .capture-modal .capture-bottom {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .capture-modal .capture-bottom > * {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .capture-modal .capture-bottom > [data-slot="input"] {
+    grid-column: 1 / -1;
+  }
+
+  .capture-modal .record-mode-shell > .source-trigger {
+    flex-basis: 128px;
+    width: 128px;
+  }
+}
+
+@media (max-width: 420px) {
+  .product-header {
+    align-items: center;
+  }
+
+  .brand-glyph.logo-mark,
+  .product-header .brand-glyph.logo-mark {
+    width: 42px;
+    height: 42px;
+  }
+
+  .brand-lockup strong {
+    font-size: 16px;
+  }
+
+  .brand-lockup span {
+    max-width: 128px;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .section-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .section-heading h2 {
+    font-size: 22px;
+  }
+
+  .feed-controls .advanced-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .context-actions {
+    flex-wrap: wrap;
+  }
+
+  .context-actions .inline-trigger,
+  .context-actions > [data-slot="button"] {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .product-header {
+    align-items: flex-start;
+  }
+
+  .header-settings[data-slot="button"],
+  .header-actions > .status-chip {
+    width: 36px;
+    flex-basis: 36px;
+  }
+
+  .feed-section {
+    padding: 10px;
+  }
+
+  .memory-card {
+    grid-template-columns: 24px minmax(0, 1fr) !important;
+  }
+
+  .memory-card .memory-entity {
+    grid-column: 2 !important;
+    justify-items: start;
   }
 }
 
@@ -5851,6 +6446,222 @@ body {
 }
 
 /* Final control normalization, after responsive and component rules. */
+/* Keep the responsive contract after all historical layout passes. */
+/* Feed filters stay on one horizontal rail at compact widths. */
+/* The advanced filter section must contribute its controls to the same grid. */
+@media (max-width: 900px) {
+  .feed-controls {
+    display: grid !important;
+    grid-template-columns: minmax(140px, 1.55fr) repeat(4, minmax(72px, 1fr)) !important;
+    gap: 6px !important;
+    padding: 6px !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+
+  .feed-controls .command-bar,
+  .feed-controls .advanced-filters {
+    display: contents !important;
+  }
+
+  .feed-controls .advanced-filters > * { grid-column: auto !important; }
+
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters > * {
+    grid-column: auto !important;
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .feed-controls .advanced-filters > span { display: none !important; }
+
+  .feed-controls .search-input,
+  .feed-controls .source-trigger,
+  .feed-controls .advanced-filters .inline-trigger,
+  .feed-controls .advanced-filters [data-slot="input"] {
+    min-height: 42px !important;
+    height: 42px !important;
+    padding-inline: 10px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 520px) {
+  .feed-controls {
+    grid-template-columns: minmax(120px, 1.45fr) repeat(4, minmax(54px, 1fr)) !important;
+    gap: 4px !important;
+  }
+
+  .feed-controls .search-input,
+  .feed-controls .source-trigger,
+  .feed-controls .advanced-filters .inline-trigger,
+  .feed-controls .advanced-filters [data-slot="input"] {
+    min-height: 38px !important;
+    height: 38px !important;
+    padding-inline: 6px !important;
+    font-size: 12px !important;
+  }
+}
+
+html, body, #root,
+.product-shell, .product-header, .workspace-layout, .workspace-main,
+.feed-section, .settings-page, .feed-controls, .memory-grid, .memory-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body { overflow-x: hidden; }
+
+@media (max-width: 1180px) {
+  .workspace-layout { display: block; }
+  .workspace-nav { display: none !important; }
+  .workspace-main { width: 100%; }
+}
+
+@media (max-width: 900px) {
+  .feed-controls {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(132px, .45fr) !important;
+    gap: 8px;
+    overflow: visible;
+  }
+  .feed-controls .command-bar { display: contents !important; }
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger { grid-column: 1 / -1 !important; }
+  .feed-controls .advanced-filters {
+    display: grid !important;
+    grid-column: 1 / -1 !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .feed-controls .advanced-filters > span { display: none; }
+  .feed-controls .advanced-filters > * { grid-column: auto !important; width: 100%; min-width: 0; }
+}
+
+@media (max-width: 760px) {
+  .product-shell { padding: 8px 8px 20px; }
+  .product-header { display: flex; gap: 10px; }
+  .header-actions { max-width: none; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
+  .brand-lockup, .brand-lockup > div:last-child { min-width: 0; }
+  .brand-lockup span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-section { padding: 12px; border-radius: 16px; }
+  .section-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+  .section-heading > div:first-child { grid-column: 1; }
+  .section-heading > .feed-actions { grid-column: 2; grid-row: 1; margin-left: 0; }
+  .section-heading > .context-pack { grid-column: 1 / -1; grid-row: 2; margin-left: 0; }
+  .feed-controls { grid-template-columns: 1fr !important; gap: 8px; padding: 8px; }
+  .feed-controls .search-input, .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters { grid-column: 1 / -1 !important; }
+  .feed-controls .advanced-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .memory-card { grid-template-columns: 28px minmax(0, 1fr) auto !important; gap: 8px 10px; padding: 12px; }
+  .memory-card .memory-time { grid-column: 2 !important; }
+  .memory-card .memory-entity { grid-column: 3 !important; justify-items: end; }
+  .memory-content-cell, .memory-category, .memory-life, .memory-card .card-actions { grid-column: 1 / -1 !important; }
+  .settings-page { padding: 18px 14px 28px; }
+  .settings-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .settings-tabs::-webkit-scrollbar { display: none; }
+}
+
+@media (max-width: 600px) {
+  .capture-modal { width: calc(100vw - 20px) !important; max-height: calc(100dvh - 20px) !important; overflow-y: auto; padding: 16px !important; }
+  .capture-modal .capture-bottom { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .capture-modal .capture-bottom > * { width: 100% !important; min-width: 0 !important; }
+  .capture-modal .capture-bottom > [data-slot="input"] { grid-column: 1 / -1; }
+}
+
+@media (max-width: 420px) {
+  .brand-glyph.logo-mark, .product-header .brand-glyph.logo-mark { width: 42px; height: 42px; }
+  .brand-lockup strong { font-size: 16px; }
+  .brand-lockup span { max-width: 128px; }
+  .section-heading h2 { font-size: 22px; }
+  .feed-controls .advanced-filters { grid-template-columns: 1fr; }
+  .context-actions { flex-wrap: wrap; }
+}
+
+/* Keep the filter rail single-line after all compact density rules. */
+@media (max-width: 900px) {
+  .feed-controls {
+    display: grid !important;
+    grid-template-columns: minmax(140px, 1.55fr) repeat(4, minmax(72px, 1fr)) !important;
+    gap: 6px !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .feed-controls .command-bar,
+  .feed-controls .advanced-filters { display: contents !important; }
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters > * { grid-column: auto !important; min-width: 0 !important; width: 100%; }
+  .feed-controls .advanced-filters > span { display: none !important; }
+}
+
+@media (max-width: 520px) {
+  .feed-controls { grid-template-columns: minmax(120px, 1.45fr) repeat(4, minmax(54px, 1fr)) !important; }
+}
+
+/* Medium and small screens keep only search + time range. */
+@media (max-width: 1180px) {
+  .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters > .inline-trigger:nth-child(2),
+  .feed-controls .advanced-filters > .inline-trigger:nth-child(3) {
+    display: none !important;
+  }
+
+  .feed-controls {
+    grid-template-columns: minmax(0, 1fr) 150px !important;
+    overflow: visible;
+  }
+
+  .feed-controls .search-input,
+  .feed-controls .advanced-filters > .inline-trigger:nth-child(1) {
+    grid-column: auto !important;
+  }
+
+  .feed-controls {
+    grid-template-columns: minmax(0, 1fr) 160px !important;
+  }
+}
+
+/* Mobile memory cards read as stable rows instead of a loose column stack. */
+@media (max-width: 900px) {
+  .memory-card {
+    grid-template-columns: 28px minmax(0, 1fr) auto !important;
+    gap: 8px 10px;
+    padding: 12px;
+  }
+
+  .memory-card .memory-selection-cell { grid-column: 1 !important; grid-row: 1 !important; }
+  .memory-card .memory-time { grid-column: 2 !important; grid-row: 1 !important; }
+  .memory-card .memory-entity { grid-column: 3 !important; grid-row: 1 !important; justify-items: end; }
+  .memory-card .memory-content-cell { grid-column: 1 / -1 !important; }
+
+  .memory-card .memory-category {
+    grid-column: 1 / 3 !important;
+    align-self: center;
+  }
+
+  .memory-card .memory-life {
+    grid-column: 3 !important;
+    justify-self: end;
+    align-self: center;
+  }
+
+  .memory-card .memory-category [data-slot="button"],
+  .memory-card .memory-life [data-slot="badge"] {
+    margin: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .memory-card .memory-category { grid-column: 1 !important; }
+  .memory-card .memory-life { grid-column: 2 !important; }
+}
+
 .inline-trigger,
 .source-trigger,
 .advanced-filters input,
@@ -5887,4 +6698,190 @@ body {
   background: var(--surface) !important;
   font-weight: 400;
   box-shadow: 0 4px 12px rgba(25, 28, 35, 0.05);
+}
+
+/* The final cascade must keep the compact feed controls on one row. */
+@media (max-width: 900px) {
+  .feed-controls {
+    grid-template-columns: minmax(140px, 1.55fr) repeat(4, minmax(72px, 1fr)) !important;
+    display: grid !important;
+    gap: 6px !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .feed-controls .command-bar,
+  .feed-controls .advanced-filters { display: contents !important; }
+
+  .feed-controls .search-input,
+  .feed-controls .command-bar > .source-trigger,
+  .feed-controls .advanced-filters > * {
+    grid-column: auto !important;
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .feed-controls .advanced-filters > span { display: none !important; }
+}
+
+@media (max-width: 520px) {
+  .feed-controls {
+    grid-template-columns: minmax(120px, 1.45fr) repeat(4, minmax(54px, 1fr)) !important;
+  }
+
+  .feed-controls .search-input,
+  .feed-controls .source-trigger,
+  .feed-controls .advanced-filters .inline-trigger,
+  .feed-controls .advanced-filters [data-slot="input"] {
+    min-height: 38px !important;
+    height: 38px !important;
+    padding-inline: 6px !important;
+    font-size: 12px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* After hiding the three optional actions, let search use the freed width. */
+@media (max-width: 1180px) {
+  .feed-controls {
+    grid-template-columns: minmax(0, 1fr) 160px !important;
+    overflow: visible;
+  }
+}
+
+/* Compact memory list for medium and small screens: one record, one row. */
+@media (max-width: 900px) {
+  .memory-card {
+    grid-template-columns: 28px minmax(0, 1fr) 72px auto !important;
+    grid-template-rows: minmax(42px, auto) !important;
+    align-items: center;
+    min-height: 58px;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .memory-card .memory-selection-cell {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .memory-card .memory-content-cell {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+  }
+
+  .memory-card .memory-content-cell p {
+    display: none !important;
+  }
+
+  .memory-card .memory-title-button {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .memory-card .memory-time {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .memory-card .memory-life {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+    justify-self: end;
+  }
+
+  .memory-card .memory-entity,
+  .memory-card .memory-category {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .memory-card {
+    grid-template-columns: 24px minmax(0, 1fr) 58px auto !important;
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .memory-card .memory-time { width: 58px; font-size: 12px; }
+}
+
+/* Pagination stays as one compact horizontal row on small screens. */
+@media (max-width: 900px) {
+  .memory-pagination {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .page-size-options,
+  .page-navigation {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .page-size-options button,
+  .page-navigation button {
+    min-width: 34px;
+    width: 34px;
+    min-height: 38px;
+    height: 38px;
+    padding-inline: 4px;
+  }
+
+  .page-navigation > span { min-width: 46px; }
+}
+
+/* Capture actions: source, paste, and save share one row on small screens. */
+@media (max-width: 600px) {
+  .capture-modal .capture-bottom {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .capture-modal .capture-bottom > [data-slot="input"] {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+  }
+
+  .capture-modal .capture-bottom > .source-trigger {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+
+  .capture-modal .capture-bottom > .clipboard-action {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+  }
+
+  .capture-modal .capture-bottom > button[type="submit"] {
+    grid-column: 3 !important;
+    grid-row: 2 !important;
+    min-width: 0 !important;
+    padding-inline: 6px !important;
+  }
 }
