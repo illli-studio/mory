@@ -87,7 +87,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
 function loadLanguage(): Language {
   try {
-    return localStorage.getItem("mory.language") === "zh" ? "zh" : "en";
+    const saved = localStorage.getItem("mory.language");
+    if (saved === "zh" || saved === "en") return saved;
+
+    // Respect the browser's language only for the first visit. Once the user
+    // changes the setting, the explicit preference above remains authoritative.
+    const browserLanguages = navigator.languages?.length ? navigator.languages : [navigator.language];
+    return browserLanguages.some((language) => /^zh(?:-|$)/i.test(language)) ? "zh" : "en";
   } catch {
     return "en";
   }
