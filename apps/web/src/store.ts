@@ -1,19 +1,23 @@
-import { computeStats, createMemory, matchesMemory, type CreateMemoryInput, type MemoryObject } from "@mory/memory-core";
+import { computeStats, createMemory, matchesMemory, type CreateMemoryInput, type MemoryKind, type MemoryObject } from "@mory/memory-core";
 import { create } from "zustand";
 import { clearMemories, deleteMemory, loadMemories, saveMemory, updateMemory, upsertMemories } from "./db";
-import { hasGithubConfig, mergeGithubMemories, pullGithubMemories, pushGithubMemories, type GithubSyncConfig } from "./github-sync";
+import { hasGithubConfig, mergeGithubMemories, pullGithubSnapshot, pushGithubMemories, SyncConflictError, type GithubSyncConfig } from "./github-sync";
 
 const defaultGithubConfig: GithubSyncConfig = {
+  provider: "",
   token: "",
-  owner: "illli-studio",
-  repo: "mory",
-  branch: "main",
-  path: "mory/memories.json",
+  owner: "",
+  repo: "",
+  branch: "",
+  path: "",
+  autoSync: false,
+  deviceName: "",
 };
 
 interface MemoryState {
   memories: MemoryObject[];
   query: string;
+  kindFilter: MemoryKind | "all";
   source: string;
   timeRange: "all" | "today" | "week" | "month";
   privacy: "all" | "public" | "private";
@@ -34,6 +38,7 @@ interface MemoryState {
   pullGithub: () => Promise<void>;
   mergeGithub: () => Promise<void>;
   setQuery: (query: string) => void;
+  setKindFilter: (kind: MemoryKind | "all") => void;
   setSource: (source: string) => void;
   setTimeRange: (timeRange: MemoryState["timeRange"]) => void;
   setPrivacy: (privacy: MemoryState["privacy"]) => void;
@@ -44,6 +49,7 @@ interface MemoryState {
 export const useMemoryStore = create<MemoryState>((set, get) => ({
   memories: [],
   query: "",
+  kindFilter: "all",
   source: "all",
   timeRange: "all",
   privacy: "all",
@@ -55,6 +61,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     set({ isLoading: true, error: undefined });
     try {
       set({ memories: (await loadMemories()).map(normalizeMemory), isLoading: false });
+      if (hasGithubConfig(get().github) && get().github.autoSync) void get().mergeGithub();
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load memories.", isLoading: false });
     }
@@ -63,8 +70,11 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     set({ error: undefined });
     try {
       const memory = await createMemory(input);
+      memory.origin = getDeviceOrigin(get().github.deviceName);
+      memory.updatedAt = new Date().toISOString();
       await saveMemory(memory);
       set({ memories: [memory, ...get().memories] });
+      queueAutoSync(get);
       return true;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to save memory." });
@@ -75,6 +85,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     set({ error: undefined });
     try {
       const created = await Promise.all(inputs.map((input) => createMemory(input)));
+      created.forEach((memory) => { memory.origin = getDeviceOrigin(get().github.deviceName); memory.updatedAt = new Date().toISOString(); });
       let savedCount = 0;
       let skippedCount = 0;
       for (const memory of created) {
@@ -86,26 +97,35 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
         }
       }
       const detail = skippedCount ? ` Skipped ${skippedCount} duplicate${skippedCount === 1 ? "" : "s"}.` : "";
-      set({ memories: await loadMemories(), syncMessage: `Imported ${savedCount} memory object${savedCount === 1 ? "" : "s"}.${detail}` });
+      set({ memories: (await loadMemories()).map(normalizeMemory), syncMessage: `Imported ${savedCount} memory object${savedCount === 1 ? "" : "s"}.${detail}` });
+      queueAutoSync(get);
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Import failed." });
     }
   },
   async update(memory) {
-    await updateMemory(memory);
-    set({ memories: get().memories.map((item) => (item.id === memory.id ? memory : item)) });
+    const next = { ...memory, origin: memory.origin ?? getDeviceOrigin(get().github.deviceName), updatedAt: new Date().toISOString() };
+    await updateMemory(next);
+    set({ memories: get().memories.map((item) => (item.id === next.id ? next : item)) });
+    queueAutoSync(get);
   },
   async remove(id) {
     await deleteMemory(id);
     set({ memories: get().memories.filter((memory) => memory.id !== id) });
+    addTombstone(id);
+    queueAutoSync(get);
   },
   async clear() {
+    const ids = get().memories.map((memory) => memory.id);
     await clearMemories();
     set({ memories: [] });
+    ids.forEach(addTombstone);
+    queueAutoSync(get);
   },
   updateGithub(config) {
     const github = { ...get().github, ...config };
-    localStorage.setItem("mory.github", JSON.stringify({ ...github, token: "" }));
+    if (config.deviceName) localStorage.setItem("mory.deviceName", config.deviceName);
+    localStorage.setItem("mory.github", JSON.stringify(github));
     set({ github });
   },
   async pushGithub() {
@@ -114,12 +134,24 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       set({ error: "GitHub sync needs token, owner, repo, branch and path." });
       return;
     }
+    if (syncInFlight) return;
+    syncInFlight = true;
     set({ error: undefined, syncMessage: "Pushing memories to GitHub..." });
     try {
       const result = await pushGithubMemories(github, memories);
-      set({ syncMessage: `${result.message} ${result.uploadedCount ?? memories.length} objects uploaded.` });
+      localStorage.setItem("mory.sync.tombstones", JSON.stringify([]));
+      const uploadedCount = result.uploadedCount ?? memories.length;
+      set({ syncMessage: `Pushed ${uploadedCount} memory objects to ${github.provider === "gitee" ? "Gitee" : "GitHub"}.` });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : "GitHub push failed.", syncMessage: undefined });
+      if (error instanceof SyncConflictError) {
+        set({ error: undefined, syncMessage: "Merging local and remote memories..." });
+        queueConflictRetry(get);
+        return;
+      }
+      set({ error: undefined, syncMessage: undefined });
+      queueConflictRetry(get);
+    } finally {
+      syncInFlight = false;
     }
   },
   async pullGithub() {
@@ -128,15 +160,19 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       set({ error: "GitHub sync needs token, owner, repo, branch and path." });
       return;
     }
-    set({ error: undefined, syncMessage: "Pulling memories from GitHub..." });
+    if (syncInFlight) return;
+    syncInFlight = true;
+    set({ error: undefined, syncMessage: "Pulling memories from the remote repository..." });
     try {
-      const remoteMemories = await pullGithubMemories(github);
+      const remoteSnapshot = await pullGithubSnapshot(github);
+      const remoteMemories = remoteSnapshot.memories;
+      const remoteTombstones = new Set(remoteSnapshot.tombstones);
       const localById = new Map(localMemories.map((memory) => [memory.id, memory]));
       const conflicts = remoteMemories.filter((remote) => {
         const local = localById.get(remote.id);
         return local && local.contentHash !== remote.contentHash;
       }).length;
-      const merged = new Map(localById);
+      const merged = new Map(Array.from(localById).filter(([id]) => !remoteTombstones.has(id)));
 
       for (const remote of remoteMemories) {
         if (!merged.has(remote.id)) {
@@ -145,11 +181,16 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       }
 
       const memories = Array.from(merged.values()).sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+      await clearMemories();
       await upsertMemories(memories);
+      localStorage.setItem("mory.sync.tombstones", JSON.stringify(remoteSnapshot.tombstones));
       const normalized = memories.map(normalizeMemory);
-      set({ memories: normalized, syncMessage: `Pulled ${normalized.length} objects from GitHub.` });
+      set({ memories: normalized, syncMessage: `Pulled ${normalized.length} memory objects from ${github.provider === "gitee" ? "Gitee" : "GitHub"}.` });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : "GitHub pull failed.", syncMessage: undefined });
+      set({ error: undefined, syncMessage: undefined });
+      queueConflictRetry(get);
+    } finally {
+      syncInFlight = false;
     }
   },
   async mergeGithub() {
@@ -158,18 +199,42 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       set({ error: "GitHub sync needs token, owner, repo, branch and path." });
       return;
     }
-    set({ error: undefined, syncMessage: "Merging local and GitHub memories..." });
+    if (syncInFlight) return;
+    syncInFlight = true;
+    set({ error: undefined, syncMessage: "Merging local and remote memories..." });
     try {
-      const merged = await mergeGithubMemories(github, memories);
-      await upsertMemories(merged);
-      await pushGithubMemories(github, merged);
-      set({ memories: merged, syncMessage: `Merged and pushed ${merged.length} objects.` });
+      let merged: Awaited<ReturnType<typeof mergeGithubMemories>> | undefined;
+      for (let attempt = 0; attempt < 4 && !merged; attempt += 1) {
+        const candidate = await mergeGithubMemories(github, memories, loadTombstones());
+        try {
+          await pushGithubMemories(github, candidate.memories, candidate.tombstones);
+          merged = candidate;
+        } catch (error) {
+          if (!(error instanceof SyncConflictError) || attempt === 3) throw error;
+        }
+      }
+      if (!merged) throw new SyncConflictError();
+      await clearMemories();
+      await upsertMemories(merged.memories);
+      set({ memories: merged.memories, syncMessage: `Merged and pushed ${merged.memories.length} memory objects.` });
+      localStorage.setItem("mory.sync.tombstones", JSON.stringify(merged.tombstones));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : "GitHub merge failed.", syncMessage: undefined });
+      if (error instanceof SyncConflictError) {
+        set({ error: undefined, syncMessage: "Merging local and remote memories..." });
+        queueConflictRetry(get);
+        return;
+      }
+      set({ error: undefined, syncMessage: undefined });
+      queueConflictRetry(get);
+    } finally {
+      syncInFlight = false;
     }
   },
   setQuery(query) {
     set({ query });
+  },
+  setKindFilter(kindFilter) {
+    set({ kindFilter });
   },
   setSource(source) {
     set({ source });
@@ -192,10 +257,11 @@ export function selectFilteredMemories(state: MemoryState): MemoryObject[] {
   const now = new Date();
   const filtered = state.memories.filter((memory) => {
     const sourceMatches = state.source === "all" || memory.source === state.source;
+    const kindMatches = state.kindFilter === "all" || (memory.kind ?? "note") === state.kindFilter;
     const privacyMatches = state.privacy === "all" || (state.privacy === "private" ? memory.isPrivate : !memory.isPrivate);
     const tagMatches = !state.tagFilter.trim() || memory.tags.some((tag) => tag.includes(state.tagFilter.trim().replace(/^#/, "").toLowerCase()));
     const timeMatches = matchesTimeRange(memory.capturedAt, state.timeRange, now);
-    return sourceMatches && privacyMatches && tagMatches && timeMatches && matchesMemory(memory, state.query);
+    return sourceMatches && kindMatches && privacyMatches && tagMatches && timeMatches && matchesMemory(memory, state.query);
   });
 
   return filtered.sort((a, b) => {
@@ -207,7 +273,7 @@ export function selectFilteredMemories(state: MemoryState): MemoryObject[] {
 }
 
 function normalizeMemory(memory: MemoryObject): MemoryObject {
-  const candidate = memory as Partial<MemoryObject> & { payload?: Partial<MemoryObject["payload"]> };
+  const candidate = memory as Partial<MemoryObject> & { payload?: Partial<MemoryObject["payload"]>; origin?: Partial<NonNullable<MemoryObject["origin"]>> };
   const payload = (candidate.payload ?? {}) as Partial<MemoryObject["payload"]>;
   const validSources = ["manual", "clipboard", "browser", "file", "chat", "github"] as const;
   const validTypes = ["raw", "preview", "snapshot", "relation"] as const;
@@ -220,6 +286,7 @@ function normalizeMemory(memory: MemoryObject): MemoryObject {
     source,
     type,
     capturedAt: typeof candidate.capturedAt === "string" && candidate.capturedAt ? candidate.capturedAt : new Date().toISOString(),
+    updatedAt: typeof candidate.updatedAt === "string" && candidate.updatedAt ? candidate.updatedAt : (typeof candidate.capturedAt === "string" && candidate.capturedAt ? candidate.capturedAt : new Date().toISOString()),
     contentHash: String(candidate.contentHash ?? candidate.id ?? crypto.randomUUID()),
     payload: {
       title: String(payload.title ?? "Untitled memory"),
@@ -230,6 +297,7 @@ function normalizeMemory(memory: MemoryObject): MemoryObject {
     score: typeof candidate.score === "number" && Number.isFinite(candidate.score) ? candidate.score : 1,
     schemaVersion: typeof candidate.schemaVersion === "number" ? candidate.schemaVersion : 1,
     fields: candidate.fields && typeof candidate.fields === "object" ? candidate.fields : {},
+    origin: candidate.origin && typeof candidate.origin === "object" ? { deviceId: String(candidate.origin.deviceId ?? ""), deviceName: String(candidate.origin.deviceName ?? "") } : undefined,
   };
 }
 
@@ -262,9 +330,43 @@ function matchesTimeRange(capturedAt: string, range: MemoryState["timeRange"], n
 
 function loadGithubConfig(): GithubSyncConfig {
   try {
+    const resetMarker = "mory.github.empty-config.v1";
+    if (!localStorage.getItem(resetMarker)) {
+      localStorage.removeItem("mory.github");
+      localStorage.setItem(resetMarker, "1");
+      return { ...defaultGithubConfig };
+    }
     const saved = JSON.parse(localStorage.getItem("mory.github") ?? "{}") as Partial<GithubSyncConfig>;
-    return { ...defaultGithubConfig, ...saved, token: "" };
+    return { ...defaultGithubConfig, ...saved };
   } catch {
-    return defaultGithubConfig;
+    return { ...defaultGithubConfig };
   }
+}
+
+function getDeviceOrigin(deviceName: string) {
+  let deviceId = localStorage.getItem("mory.deviceId");
+  if (!deviceId) { deviceId = crypto.randomUUID(); localStorage.setItem("mory.deviceId", deviceId); }
+  return { deviceId, deviceName: deviceName || localStorage.getItem("mory.deviceName") || navigator.platform || "This device" };
+}
+
+function loadTombstones(): string[] {
+  try { return JSON.parse(localStorage.getItem("mory.sync.tombstones") ?? "[]") as string[]; } catch { return []; }
+}
+
+function addTombstone(id: string): void {
+  const tombstones = new Set(loadTombstones()); tombstones.add(id); localStorage.setItem("mory.sync.tombstones", JSON.stringify(Array.from(tombstones)));
+}
+
+let autoSyncTimer: number | undefined;
+let syncInFlight = false;
+function queueAutoSync(get: () => MemoryState): void {
+  if (!get().github.autoSync || !hasGithubConfig(get().github)) return;
+  window.clearTimeout(autoSyncTimer);
+  autoSyncTimer = window.setTimeout(() => void get().mergeGithub(), 1200);
+}
+
+function queueConflictRetry(get: () => MemoryState): void {
+  if (!get().github.autoSync || !hasGithubConfig(get().github)) return;
+  window.clearTimeout(autoSyncTimer);
+  autoSyncTimer = window.setTimeout(() => void get().mergeGithub(), 5000);
 }

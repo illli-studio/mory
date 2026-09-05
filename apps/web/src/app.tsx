@@ -9,13 +9,14 @@ import {
   ChevronDown,
   Clipboard,
   Cloud,
+  CloudCheck,
+  CloudOff,
   Database,
   Download,
   FileText,
   Github,
   Globe,
   Link,
-  LockKeyhole,
   MessageCircle,
   Pencil,
   ReceiptText,
@@ -27,13 +28,16 @@ import {
   NotebookPen,
   Shield,
   SlidersHorizontal,
+  Palette,
   Search,
+  RefreshCw,
   Send,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { createPreview, domainTag, extractUrls, type MemoryKind, type MemoryObject, type MemorySource } from "@mory/memory-core";
+import { checkGithubConnection, parseRepositoryUrl } from "./github-sync";
 import { selectFilteredMemories, selectStats, useMemoryStore } from "./store";
-import { backupRemoteGithub, getMoryApiConfig, hasMoryApiConfig, setMoryApiConfig } from "./mory-api";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
@@ -44,6 +48,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent } from "./components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./components/ui/dropdown-menu";
 import { MoryLogo } from "./components/mory-logo";
+import { useLanguage, type Language, type TranslationKey } from "./i18n";
+import { themes, useTheme } from "./theme";
 
 const sources: Array<{ value: MemorySource | "all"; label: string }> = [
   { value: "all", label: "All sources" },
@@ -69,25 +75,43 @@ const recordModes: Array<{ kind: MemoryKind; label: string; hint: string }> = [
 ];
 
 export function App() {
+  const { t } = useLanguage();
   const store = useMemoryStore();
-  const { load, error, syncMessage, query, setQuery, source, setSource, isLoading } = store;
-  const memories = useMemo(() => selectFilteredMemories(store), [store.memories, store.query, store.source]);
+  const { load, error, query, setQuery, kindFilter, setKindFilter, source, setSource, isLoading } = store;
+  const memories = useMemo(() => selectFilteredMemories(store), [store.memories, store.query, store.kindFilter, store.source, store.timeRange, store.privacy, store.tagFilter, store.sortBy]);
   const stats = useMemo(() => selectStats(store), [store.memories]);
+  const syncMessage = store.syncMessage ?? "";
+  const visibleError = error && !isBackgroundSyncError(error) ? error : undefined;
+  const syncConfigured = Boolean(store.github.token && store.github.owner && store.github.repo && store.github.branch && store.github.path);
+  const syncStatus = !syncConfigured ? "local" : /^(Pushing|Pulling|Merging)/.test(syncMessage) ? "syncing" : "synced";
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectionMode, setSelectionMode] = useState(false);
   const [activeMemoryId, setActiveMemoryId] = useState<string | null>(null);
   const [activeUtilityPanel, setActiveUtilityPanel] = useState<UtilityPanel | null>(null);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureKind, setCaptureKind] = useState<MemoryKind>("note");
-  const recordNavRef = useRef<HTMLDivElement>(null);
-  const [compactRecordNav, setCompactRecordNav] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const selectedMemories = useMemo(() => store.memories.filter((memory) => selectedIds.includes(memory.id)), [store.memories, selectedIds]);
   const activeMemory = useMemo(() => store.memories.find((memory) => memory.id === activeMemoryId), [store.memories, activeMemoryId]);
-  const selectedRecordKind = recordModes.some((mode) => mode.kind === query) ? query as MemoryKind : "note";
+  const totalPages = Math.max(1, Math.ceil(memories.length / pageSize));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, kindFilter, source, store.timeRange, store.privacy, store.tagFilter, store.sortBy]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!store.github.autoSync) return;
+    const timer = window.setInterval(() => void store.mergeGithub(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [store.github.autoSync, store.mergeGithub]);
 
   useEffect(() => {
     if (!captureOpen) return;
@@ -98,103 +122,71 @@ export function App() {
     };
   }, [captureOpen]);
 
-  useEffect(() => {
-    const nav = recordNavRef.current;
-    if (!nav) return;
-    const measure = () => setCompactRecordNav(nav.scrollWidth > nav.clientWidth + 1);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(nav);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <main className="product-shell">
       <header className="product-header">
         <div className="brand-lockup">
           <div className="brand-glyph logo-mark">
-            <MoryLogo size={38} />
+            <MoryLogo size={52} />
           </div>
           <div>
             <strong>Mory</strong>
-            <span>Local memory repository</span>
+            <span>{t("localRepository")}</span>
           </div>
         </div>
         <div className="header-actions">
-          <StatusChip tone="good" label="Local-first" />
-          <StatusChip tone="neutral" label={`${stats.total} objects`} />
+          <Button variant="ghost" className="header-settings" type="button" onClick={() => toggleUtilityPanel("github")} aria-pressed={activeUtilityPanel !== null}>
+            <SlidersHorizontal size={16} />
+            <span>{t("settings")}</span>
+          </Button>
+          <StatusChip status={syncStatus} label={`${t(`sync${syncStatus[0].toUpperCase()}${syncStatus.slice(1)}` as TranslationKey)} · ${stats.total} ${t("objectCount")}`} />
         </div>
       </header>
 
       <section className="workspace-layout">
-        <aside className="workspace-nav" aria-label="Record type navigation">
-          <Button variant="ghost" className="nav-brand-card" type="button" onClick={() => setCaptureOpen(true)} aria-label="Open memory capture">
-            <div className="brand-glyph logo-mark">
-              <MoryLogo size={38} />
-            </div>
-            <div>
-              <strong>Mory</strong>
-              <span>Storehouse</span>
-            </div>
-          </Button>
-          <div className="nav-section-label">Record types</div>
-          <div ref={recordNavRef} className={compactRecordNav ? "record-nav-list measure-only" : "record-nav-list"}>
+        <aside className="workspace-nav" aria-label={t("recordTypes")}>
+          <div className="nav-section-label">{t("recordTypes")}</div>
+          <div className="record-nav-list all-memory-list">
+            <Button variant="ghost" className={kindFilter === "all" ? "active" : ""} type="button" onClick={() => { setActiveUtilityPanel(null); setKindFilter("all"); setQuery(""); }}>
+              <Archive size={17} />
+              <span>{t("allMemories")}</span>
+              <strong>{stats.total}</strong>
+            </Button>
+          </div>
+          <div className="record-nav-list all-types-list">
             {recordModes.map((mode) => {
               const count = store.memories.filter((memory) => (memory.kind ?? "note") === mode.kind).length;
               return (
-                <Button key={mode.kind} variant="ghost" type="button" onClick={() => { setActiveUtilityPanel(null); setQuery(mode.kind === "note" ? "" : mode.kind); }}>
+                <Button key={mode.kind} variant="ghost" className={kindFilter === mode.kind ? "active" : ""} type="button" onClick={() => { setActiveUtilityPanel(null); setKindFilter(mode.kind); setQuery(""); }}>
                   {recordIcon(mode.kind)}
-                  <span>{mode.label}</span>
+                  <span>{recordLabel(mode.kind, t)}</span>
                   <strong>{count}</strong>
                 </Button>
               );
             })}
           </div>
-          {compactRecordNav ? <RecordTypeSelect value={selectedRecordKind} onChange={(value) => { setActiveUtilityPanel(null); setQuery(value === "note" ? "" : value); }} /> : null}
-          <div className="nav-section-label">Shortcuts</div>
-          <div className="shortcut-list">
-              <Button variant="ghost" type="button" onClick={() => { setActiveUtilityPanel(null); setQuery("private"); }}>Private</Button>
-              <Button variant="ghost" type="button" onClick={() => { setActiveUtilityPanel(null); setQuery("waiting"); }}>Waiting</Button>
-              <Button variant="ghost" type="button" onClick={() => { setActiveUtilityPanel(null); setQuery("bookmark"); }}>Bookmarks</Button>
-          </div>
-          <div className="nav-section-label">Manage</div>
-          <div className="utility-nav-list">
-            <UtilityNavButton icon={<SlidersHorizontal size={16} />} label="Settings" active={activeUtilityPanel !== null} onClick={() => toggleUtilityPanel("access")} />
-          </div>
         </aside>
         <div className="workspace-main">
         {activeUtilityPanel ? (
-          <SettingsPage panel={activeUtilityPanel} stats={stats} memories={store.memories} onPanelChange={setActiveUtilityPanel} onConnected={() => void load()} />
+          <SettingsPage panel={activeUtilityPanel} stats={stats} onPanelChange={setActiveUtilityPanel} />
         ) : (
           <section className="feed-section">
-            <div className="feed-controls">
-              <div className="command-bar">
-              <label className="search-input">
-                <Search size={18} />
-                <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search memories, tags, links, bills, tasks..." />
-              </label>
-              <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sources} />
-              </div>
-
-              <AdvancedFilters />
-            </div>
-
-            {error ? <Notice tone="bad" text={error} onRetry={() => void load()} /> : null}
-            {syncMessage ? <Notice tone="good" text={syncMessage} /> : null}
-            <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
             <div className="section-heading">
               <div>
-                <h2>Memory Feed</h2>
-                <p>{memories.length} of {stats.total} memories</p>
+                <Button className="capture-cta feed-capture-button" type="button" onClick={() => setCaptureOpen(true)}>
+                  <Archive size={16} />
+                  {t("newMemory")}
+                </Button>
               </div>
-              <div className="feed-summary" aria-label="Repository summary">
-                <span><strong>{stats.today}</strong> today</span>
-                <span><strong>{stats.tags.length}</strong> topics</span>
+              <div className="feed-summary" aria-label={t("repositorySummary")}>
+                <span><strong>{stats.today}</strong> {t("today")}</span>
+                <span><strong>{stats.tags.length}</strong> {t("topics")}</span>
               </div>
-              <div className="feed-actions" aria-label="Repository actions">
+              <ContextPack memories={selectedMemories} onClear={() => setSelectedIds([])} />
+              <div className="feed-actions" aria-label={t("repositoryActions")}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline"><Upload size={16} /> Import</Button>
+                    <Button variant="outline" className="import-action" aria-label={t("importMemories")} title={t("importMemories")}><ArrowUpToLine size={18} strokeWidth={2} /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
                     <DropdownMenuItem asChild><BookmarkImport /></DropdownMenuItem>
@@ -205,18 +197,31 @@ export function App() {
                 <JsonExport memories={store.memories} />
               </div>
             </div>
-            <MemoryFeed memories={memories} loading={isLoading} />
+            <div className="feed-controls">
+              <div className="command-bar">
+              <label className="search-input">
+                <Search size={18} />
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("search")} />
+              </label>
+              <SourceSelect value={source as MemorySource | "all"} onChange={setSource} options={sourceOptions(t)} />
+              </div>
+
+              <AdvancedFilters />
+            </div>
+
+            {visibleError ? <Notice tone="bad" text={visibleError} onRetry={() => void load()} /> : null}
+            <MemoryFeed memories={memories} loading={isLoading} page={currentPage} pageSize={pageSize} totalPages={totalPages} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
           </section>
         )}
         </div>
 
       </section>
       <Dialog open={captureOpen} onOpenChange={setCaptureOpen}>
-          <DialogContent className="capture-modal" aria-label="Capture a memory">
+          <DialogContent className="capture-modal" aria-label={t("newMemory")}>
             <header className="capture-modal-header">
               <div>
-                <span className="eyebrow"><Archive size={15} /> New memory</span>
-                <h2>Capture something worth keeping</h2>
+                <span className="eyebrow"><Archive size={15} /> {t("newMemory")}</span>
+                <h2>{t("captureTitle")}</h2>
               </div>
             </header>
             <div className="capture-modal-body">
@@ -227,21 +232,19 @@ export function App() {
       {activeMemory ? (
         <MemoryDetailDrawer
           memory={activeMemory}
-          selected={selectedIds.includes(activeMemory.id)}
-          onSelect={(checked) => setSelectedIds((current) => (checked ? [...new Set([...current, activeMemory.id])] : current.filter((id) => id !== activeMemory.id)))}
           onClose={() => setActiveMemoryId(null)}
         />
       ) : null}
     </main>
   );
 
-  function MemoryFeed({ memories, loading }: { memories: MemoryObject[]; loading: boolean }) {
+  function MemoryFeed({ memories, loading, page, pageSize, totalPages, onPageChange, onPageSizeChange }: { memories: MemoryObject[]; loading: boolean; page: number; pageSize: number; totalPages: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }) {
     if (loading) {
       return (
         <div className="empty-feed" role="status">
           <Hourglass size={26} />
-          <h3>Loading your local repository...</h3>
-          <p>Reading memories from IndexedDB.</p>
+          <h3>{t("loading")}</h3>
+          <p>{t("reading")}</p>
         </div>
       );
     }
@@ -250,39 +253,54 @@ export function App() {
       return (
         <div className="empty-feed">
           <Archive size={26} />
-          <h3>{query ? "No memories match this filter." : "Your memory repository is waiting."}</h3>
-          <p>{query ? `Nothing matched “${query}”. Try another search or clear the filter.` : "Capture the first object above and this area becomes your living memory feed."}</p>
-          {query ? <Button variant="outline" type="button" onClick={() => setQuery("")}>Clear search</Button> : null}
+          <h3>{query ? t("noMatch") : t("waitingRepo")}</h3>
+          <p>{query ? `${t("nothingMatched")} “${query}”. ${t("tryAnother")}` : t("firstObject")}</p>
+          {query ? <Button variant="outline" type="button" onClick={() => setQuery("")}>{t("clearSearch")}</Button> : null}
         </div>
       );
     }
 
+    const pageMemories = memories.slice((page - 1) * pageSize, page * pageSize);
+
     return (
       <>
-        <div className={selectionMode ? "memory-list-header selection-mode" : "memory-list-header"}>
-        {selectionMode ? (
-          <Button variant="ghost" className="selection-toggle" type="button" onClick={() => setSelectionMode(false)} aria-label="Exit selection mode">Done</Button>
-        ) : (
-          <Button variant="ghost" className="selection-toggle" type="button" onClick={() => setSelectionMode(true)} aria-label="Enter selection mode">Select</Button>
-        )}
-        <span>Time</span>
-        <span>Entity</span>
-        <span>Memory content</span>
-        <span>Category</span>
-        <span>Lifecycle</span>
+        <div className="memory-list-header">
+        <div className="memory-selection-cell">
+          <Input
+            type="checkbox"
+            checked={pageMemories.length > 0 && pageMemories.every((memory) => selectedIds.includes(memory.id))}
+            onChange={(event) => setSelectedIds(event.target.checked ? [...new Set([...selectedIds, ...pageMemories.map((memory) => memory.id)])] : selectedIds.filter((id) => !pageMemories.some((memory) => memory.id === id)))}
+            aria-label={t("selectAll")}
+          />
         </div>
-        <div className={selectionMode ? "memory-grid selection-mode" : "memory-grid"}>
-        {memories.map((memory) => (
+        <span>{t("time")}</span>
+        <span>{t("entity")}</span>
+        <span>{t("memoryContent")}</span>
+        <span>{t("category")}</span>
+        <span>{t("lifecycle")}</span>
+        </div>
+        <div className="memory-grid">
+        {pageMemories.map((memory) => (
           <MemoryCard
             key={memory.id}
             memory={memory}
-            selectionMode={selectionMode}
             selected={selectedIds.includes(memory.id)}
             onSelect={(checked) => setSelectedIds((current) => (checked ? [...new Set([...current, memory.id])] : current.filter((id) => id !== memory.id)))}
             onOpen={() => setActiveMemoryId(memory.id)}
           />
         ))}
         </div>
+        <nav className="memory-pagination" aria-label="Pagination">
+          <div className="page-size-options">
+            <span>{t("pageSize")}</span>
+            {[10, 20, 50].map((size) => <Button key={size} variant={pageSize === size ? "default" : "outline"} type="button" onClick={() => onPageSizeChange(size)} aria-pressed={pageSize === size}>{size}</Button>)}
+          </div>
+          <div className="page-navigation">
+            <Button variant="outline" type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1} aria-label={t("previousPage")}>‹</Button>
+            <span>{page} {t("pageOf")} {totalPages}</span>
+            <Button variant="outline" type="button" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} aria-label={t("nextPage")}>›</Button>
+          </div>
+        </nav>
       </>
     );
   }
@@ -292,15 +310,28 @@ export function App() {
   }
 }
 
-type UtilityPanel = "health" | "collections" | "access" | "github" | "connectors";
+type UtilityPanel = "health" | "language" | "github" | "connectors" | "theme";
 
 const utilityPanels: Array<{ value: UtilityPanel; label: string }> = [
-  { value: "access", label: "Mory API" },
-  { value: "github", label: "GitHub" },
-  { value: "connectors", label: "Connectors" },
-  { value: "collections", label: "Topics" },
+  { value: "github", label: "Memory Sync" },
+  { value: "language", label: "Language" },
+  { value: "theme", label: "Theme" },
   { value: "health", label: "Health" },
 ];
+
+function sourceOptions(t: (key: TranslationKey) => string): Array<{ value: MemorySource | "all"; label: string }> {
+  const labels: Record<MemorySource | "all", TranslationKey> = { all: "allSources", manual: "manual", clipboard: "clipboard", browser: "browser", file: "file", chat: "chat", github: "github" };
+  return sources.map((source) => ({ ...source, label: t(labels[source.value]) }));
+}
+
+function sourceLabel(source: MemorySource, t: (key: TranslationKey) => string): string {
+  return sourceOptions(t).find((item) => item.value === source)?.label ?? source;
+}
+
+function utilityLabel(value: UtilityPanel, t: (key: TranslationKey) => string): string {
+  const keys: Record<UtilityPanel, TranslationKey> = { github: "githubSync", connectors: "connectors", language: "languageSwitch", health: "health", theme: "theme" };
+  return t(keys[value]);
+}
 
 function UtilityNavButton({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
@@ -315,16 +346,13 @@ function UtilityNavButton({ icon, label, active, onClick }: { icon: React.ReactN
 function SettingsPage({
   panel,
   stats,
-  memories,
   onPanelChange,
-  onConnected,
 }: {
   panel: UtilityPanel;
   stats: ReturnType<typeof selectStats>;
-  memories: MemoryObject[];
   onPanelChange: (panel: UtilityPanel | null) => void;
-  onConnected: () => void;
 }) {
+  const { t } = useLanguage();
   const settingsTabsRef = useRef<HTMLDivElement>(null);
   const [compactSettingsTabs, setCompactSettingsTabs] = useState(false);
 
@@ -342,60 +370,34 @@ function SettingsPage({
     <section className="settings-page">
       <header className="settings-page-header">
         <div>
-          <span className="eyebrow"><SlidersHorizontal size={15} /> Repository settings</span>
-          <h1>Settings</h1>
-          <p>Manage connections and repository tools in one place.</p>
+          <h1>{t("settings")}</h1>
+          <p>{t("manageSettings")}</p>
         </div>
       </header>
       <Tabs value={panel} onValueChange={(value) => onPanelChange(value as UtilityPanel)}>
-      <TabsList ref={settingsTabsRef} className={compactSettingsTabs ? "settings-tabs measure-only" : "settings-tabs"} aria-label="Settings sections">
+      <TabsList ref={settingsTabsRef} className={compactSettingsTabs ? "settings-tabs measure-only" : "settings-tabs"} aria-label={t("settingsSections")}>
         {utilityPanels.map((item) => (
-          <TabsTrigger key={item.value} value={item.value}>{item.label}</TabsTrigger>
+          <TabsTrigger key={item.value} value={item.value}>{utilityLabel(item.value, t)}</TabsTrigger>
         ))}
       </TabsList>
       </Tabs>
       {compactSettingsTabs ? (
         <div className="settings-select">
-          <InlineSelect value={panel} onChange={(value) => onPanelChange(value as UtilityPanel)} options={utilityPanels.map((item) => ({ value: item.value, label: item.label }))} />
+          <InlineSelect value={panel} onChange={(value) => onPanelChange(value as UtilityPanel)} options={utilityPanels.map((item) => ({ value: item.value, label: utilityLabel(item.value, t) }))} />
         </div>
       ) : null}
       <div className="settings-content">
         {panel === "health" ? <SystemHealth stats={stats} /> : null}
-        {panel === "collections" ? <CollectionsPanel memories={memories} /> : null}
-        {panel === "access" ? <MoryAccessCard onConnected={onConnected} /> : null}
+        {panel === "language" ? <LanguagePanel /> : null}
         {panel === "github" ? <GithubSyncCard /> : null}
-        {panel === "connectors" ? <ConnectorRail /> : null}
-      </div>
-    </section>
-  );
-}
-
-function MoryAccessCard({ onConnected }: { onConnected: () => void }) {
-  const initial = getMoryApiConfig();
-  const [url, setUrl] = useState(initial.url);
-  const [token, setToken] = useState(initial.token);
-  const connected = hasMoryApiConfig();
-
-  function save() {
-    setMoryApiConfig({ url, token });
-    onConnected();
-  }
-
-  return (
-    <section className="side-card sync-card">
-      <div className="card-title"><Cloud size={17} /><h3>Mory API</h3></div>
-      <p className="sync-note">Connect the website and Hermes to one shared memory repository.</p>
-      <Input value={url} onChange={(event) => setUrl(event.target.value)} aria-label="Mory API URL" placeholder="http://127.0.0.1:8787" />
-      <Input className="token-input" type="password" value={token} onChange={(event) => setToken(event.target.value)} aria-label="Mory API token" placeholder="Mory API token" />
-      <div className="sync-actions">
-        <Button className="primary-action" type="button" onClick={save}>{connected ? "Reconnect" : "Connect"}</Button>
-        <span className="connector-status">{connected ? "Connected" : "Local browser mode"}</span>
+        {panel === "theme" ? <ThemePanel /> : null}
       </div>
     </section>
   );
 }
 
 function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange: (kind: MemoryKind) => void }) {
+  const { t } = useLanguage();
   const { add } = useMemoryStore();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -428,19 +430,6 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
   const [submitting, setSubmitting] = useState(false);
   const [captureError, setCaptureError] = useState("");
   const setKind = onKindChange;
-  const recordTabsRef = useRef<HTMLDivElement>(null);
-  const [compactRecordPicker, setCompactRecordPicker] = useState(false);
-
-  useEffect(() => {
-    const tabs = recordTabsRef.current;
-    if (!tabs) return;
-
-    const measure = () => setCompactRecordPicker(tabs.scrollWidth > tabs.clientWidth + 1);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(tabs);
-    return () => observer.disconnect();
-  }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -457,7 +446,6 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
 
     const detectedUrl = url || extractUrls(`${title} ${fallbackContent}`)[0] || "";
     const nextSource = kind === "chat" ? "chat" : source === "manual" && detectedUrl ? "browser" : source;
-    const urlTag = detectedUrl ? domainTag(detectedUrl) : undefined;
     setSubmitting(true);
     try {
       const added = await add({
@@ -467,7 +455,7 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
         kind,
         url: detectedUrl,
         fields: buildSceneFields(),
-        tags: [...tags.split(","), urlTag ?? "", kind === "bill" ? billCategory : ""],
+        tags: tags.split(","),
       });
       if (!added) {
         setCaptureError(useMemoryStore.getState().error ?? "Could not save this memory.");
@@ -686,9 +674,9 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
       }
       setContent((current) => (current.trim() ? `${current.trim()}\n\n${text.trim()}` : text.trim()));
       setTitle((current) => current || inferClipboardTitle(text, detectedUrl));
-      setClipboardMessage("Clipboard loaded.");
+      setClipboardMessage(t("clipboardLoaded"));
     } catch {
-      setClipboardMessage("Allow clipboard permission, then try again.");
+      setClipboardMessage(t("clipboardPermission"));
     }
   }
 
@@ -698,36 +686,26 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
         <div className="record-mode-current">
           <div className="record-mode-orb">{recordIcon(kind)}</div>
           <div>
-            <strong>{recordLabel(kind)} record</strong>
-            <span>{recordHint(kind)}</span>
+            <strong>{recordLabel(kind, t)}</strong>
           </div>
         </div>
-        <div ref={recordTabsRef} className={compactRecordPicker ? "record-mode-tabs measure-only" : "record-mode-tabs"} role="tablist" aria-label="Record type">
-          {recordModes.map((mode) => (
-            <Button variant="outline" key={mode.kind} type="button" className={kind === mode.kind ? "active" : ""} onClick={() => setKind(mode.kind)} title={mode.hint}>
-              {recordIcon(mode.kind)}
-              <span>{mode.label}</span>
-            </Button>
-          ))}
-        </div>
-        {compactRecordPicker ? <RecordTypeSelect value={kind} onChange={(value) => setKind(value as MemoryKind)} /> : null}
+        <RecordTypeSelect value={kind} onChange={(value) => setKind(value as MemoryKind)} />
       </div>
       <div className="capture-top">
-        {recordIcon(kind)}
-        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={titlePlaceholder(kind)} />
+        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={titlePlaceholder(kind, t)} />
       </div>
       <div className="scene-panel">{renderSceneFields()}</div>
-      <Textarea className={kind === "chat" ? "chat-textarea" : ""} value={content} onChange={(event) => setContent(event.target.value)} placeholder={contentPlaceholder(kind)} />
+      <Textarea className={kind === "chat" ? "chat-textarea" : ""} value={content} onChange={(event) => setContent(event.target.value)} placeholder={contentPlaceholder(kind, t)} />
       <div className="capture-bottom">
-        <SourceSelect value={kind === "chat" ? "chat" : source} onChange={(value) => setSource(value as MemorySource)} options={sources.filter((item) => item.value !== "all")} />
-        <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="tags: product, mory, research" />
+        <SourceSelect value={kind === "chat" ? "chat" : source} onChange={(value) => setSource(value as MemorySource)} options={sourceOptions(t).filter((item) => item.value !== "all")} />
+        <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder={t("tagsPlaceholder")} />
         <Button variant="secondary" className="clipboard-action" type="button" onClick={() => void pasteFromClipboard()}>
           <Clipboard size={17} />
-          Paste
+          {t("paste")}
         </Button>
         <Button type="submit">
           {saved ? <Check size={17} /> : <Send size={17} />}
-          {saved ? "Saved" : "Capture"}
+          {saved ? t("saved") : t("capture")}
         </Button>
       </div>
       {clipboardMessage ? <p className="capture-hint" role="status" aria-live="polite">{clipboardMessage}</p> : null}
@@ -738,31 +716,31 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
 
   function renderSceneFields() {
     if (kind === "note") {
-      return <p className="scene-empty">No required fields. Just capture the memory and add tags if useful.</p>;
+      return null;
     }
 
     if (kind === "bill") {
       return (
         <div className="scene-fields bill-fields">
-          <Input value={billAmount} onChange={(event) => setBillAmount(event.target.value)} placeholder="Amount, e.g. 68.90" inputMode="decimal" />
-          <Input value={billMerchant} onChange={(event) => setBillMerchant(event.target.value)} placeholder="Merchant or payee" />
-          <Input value={billCategory} onChange={(event) => setBillCategory(event.target.value)} placeholder="Category, e.g. food, infra, travel" />
+          <Input value={billAmount} onChange={(event) => setBillAmount(event.target.value)} placeholder={t("amountPlaceholder")} inputMode="decimal" />
+          <Input value={billMerchant} onChange={(event) => setBillMerchant(event.target.value)} placeholder={t("merchantPlaceholder")} />
+          <Input value={billCategory} onChange={(event) => setBillCategory(event.target.value)} placeholder={t("categoryPlaceholder")} />
           <Input value={billDate} onChange={(event) => setBillDate(event.target.value)} type="date" />
         </div>
       );
     }
 
     if (kind === "chat") {
-      return <div className="scene-fields"><Input value={chatWith} onChange={(event) => setChatWith(event.target.value)} placeholder="Conversation with / channel / room" /></div>;
+      return <div className="scene-fields"><Input value={chatWith} onChange={(event) => setChatWith(event.target.value)} placeholder={t("conversationPlaceholder")} /></div>;
     }
 
     if (kind === "finance") {
       return (
         <div className="scene-fields finance-fields">
-          <Input value={financeAmount} onChange={(event) => setFinanceAmount(event.target.value)} placeholder="Amount / value" inputMode="decimal" />
-          <Input value={financeCurrency} onChange={(event) => setFinanceCurrency(event.target.value.toUpperCase())} placeholder="Currency" />
-          <Input value={financeAccount} onChange={(event) => setFinanceAccount(event.target.value)} placeholder="Account / asset / wallet" />
-          <Input value={financeType} onChange={(event) => setFinanceType(event.target.value)} placeholder="Type: income, asset, debt, transfer" />
+          <Input value={financeAmount} onChange={(event) => setFinanceAmount(event.target.value)} placeholder={t("amountPlaceholder")} inputMode="decimal" />
+          <Input value={financeCurrency} onChange={(event) => setFinanceCurrency(event.target.value.toUpperCase())} placeholder={t("currencyPlaceholder")} />
+          <Input value={financeAccount} onChange={(event) => setFinanceAccount(event.target.value)} placeholder={t("accountPlaceholder")} />
+          <Input value={financeType} onChange={(event) => setFinanceType(event.target.value)} placeholder={t("typePlaceholder")} />
         </div>
       );
     }
@@ -774,14 +752,14 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
             value={taskStatus}
             onChange={setTaskStatus}
             options={[
-              { value: "todo", label: "Todo" },
-              { value: "doing", label: "Doing" },
-              { value: "done", label: "Done" },
-              { value: "blocked", label: "Blocked" },
+              { value: "todo", label: t("todo") },
+              { value: "doing", label: t("doing") },
+              { value: "done", label: t("done") },
+              { value: "blocked", label: t("blocked") },
             ]}
           />
           <Input value={taskDue} onChange={(event) => setTaskDue(event.target.value)} type="date" />
-          <Input value={taskOwner} onChange={(event) => setTaskOwner(event.target.value)} placeholder="Owner / project" />
+          <Input value={taskOwner} onChange={(event) => setTaskOwner(event.target.value)} placeholder={t("ownerProject")} />
         </div>
       );
     }
@@ -789,15 +767,15 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
     if (kind === "waiting") {
       return (
         <div className="scene-fields task-fields">
-          <Input value={waitingFor} onChange={(event) => setWaitingFor(event.target.value)} placeholder="Waiting for person / event / reply" />
+          <Input value={waitingFor} onChange={(event) => setWaitingFor(event.target.value)} placeholder={t("waitingPlaceholder")} />
           <Input value={waitingDue} onChange={(event) => setWaitingDue(event.target.value)} type="date" />
           <InlineSelect
             value={waitingStatus}
             onChange={setWaitingStatus}
             options={[
-              { value: "waiting", label: "Waiting" },
-              { value: "follow-up", label: "Follow-up" },
-              { value: "received", label: "Received" },
+              { value: "waiting", label: t("waiting") },
+              { value: "follow-up", label: t("followUp") },
+              { value: "received", label: t("received") },
             ]}
           />
         </div>
@@ -811,8 +789,8 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
     if (kind === "file") {
       return (
         <div className="scene-fields task-fields">
-          <Input value={fileName} onChange={(event) => setFileName(event.target.value)} placeholder="File name" />
-          <Input value={filePath} onChange={(event) => setFilePath(event.target.value)} placeholder="Path, drive URL, or storage location" />
+          <Input value={fileName} onChange={(event) => setFileName(event.target.value)} placeholder={t("fileNamePlaceholder")} />
+          <Input value={filePath} onChange={(event) => setFilePath(event.target.value)} placeholder={t("pathPlaceholder")} />
         </div>
       );
     }
@@ -820,14 +798,14 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
     if (kind === "decision") {
       return (
         <div className="scene-fields task-fields">
-          <Input value={decisionOwner} onChange={(event) => setDecisionOwner(event.target.value)} placeholder="Owner / team / project" />
+          <Input value={decisionOwner} onChange={(event) => setDecisionOwner(event.target.value)} placeholder={t("ownerTeamProject")} />
           <InlineSelect
             value={decisionStatus}
             onChange={setDecisionStatus}
             options={[
-              { value: "proposed", label: "Proposed" },
-              { value: "decided", label: "Decided" },
-              { value: "reversed", label: "Reversed" },
+              { value: "proposed", label: t("proposed") },
+              { value: "decided", label: t("decided") },
+              { value: "reversed", label: t("reversed") },
             ]}
           />
         </div>
@@ -837,7 +815,7 @@ function CaptureConsole({ kind, onKindChange }: { kind: MemoryKind; onKindChange
     return (
       <div className="scene-fields task-fields">
         <Input value={logDate} onChange={(event) => setLogDate(event.target.value)} type="date" />
-        <Input value={logMood} onChange={(event) => setLogMood(event.target.value)} placeholder="Mood, state, metric, or location" />
+        <Input value={logMood} onChange={(event) => setLogMood(event.target.value)} placeholder={t("moodPlaceholder")} />
       </div>
     );
   }
@@ -863,11 +841,12 @@ function SourceSelect({
 }
 
 function RecordTypeSelect({ value, onChange }: { value: MemoryKind; onChange: (value: string) => void }) {
+  const { t } = useLanguage();
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="source-trigger" aria-label="Record type"><SelectValue /></SelectTrigger>
+      <SelectTrigger className="source-trigger" aria-label={t("recordTypes")}><SelectValue /></SelectTrigger>
       <SelectContent>
-        {recordModes.map((mode) => <SelectItem key={mode.kind} value={mode.kind}>{mode.label}</SelectItem>)}
+        {recordModes.map((mode) => <SelectItem key={mode.kind} value={mode.kind}>{recordLabel(mode.kind, t)}</SelectItem>)}
       </SelectContent>
     </Select>
   );
@@ -885,152 +864,205 @@ function InlineSelect({ value, onChange, options }: { value: string; onChange: (
 }
 
 function AdvancedFilters() {
-  const { query, setQuery, source, setSource, timeRange, setTimeRange, privacy, setPrivacy, tagFilter, setTagFilter, sortBy, setSortBy } = useMemoryStore();
+  const { t } = useLanguage();
+  const { setQuery, setKindFilter, source, setSource, timeRange, setTimeRange, privacy, setPrivacy, sortBy, setSortBy } = useMemoryStore();
 
   function clearFilters() {
     setQuery("");
+    setKindFilter("all");
     setSource("all");
     setTimeRange("all");
     setPrivacy("all");
-    setTagFilter("");
     setSortBy("newest");
   }
 
   return (
     <section className="advanced-filters">
-      <span>
-        <SlidersHorizontal size={15} />
-        Filters
-      </span>
       <InlineSelect
         value={timeRange}
         onChange={(value) => setTimeRange(value as typeof timeRange)}
-        options={[{ value: "all", label: "Any time" }, { value: "today", label: "Today" }, { value: "week", label: "Last 7 days" }, { value: "month", label: "Last 30 days" }]}
+        options={[{ value: "all", label: t("anyTime") }, { value: "today", label: t("today") }, { value: "week", label: t("last7") }, { value: "month", label: t("last30") }]}
       />
       <InlineSelect
         value={privacy}
         onChange={(value) => setPrivacy(value as typeof privacy)}
-        options={[{ value: "all", label: "All visibility" }, { value: "public", label: "Public only" }, { value: "private", label: "Private only" }]}
+        options={[{ value: "all", label: t("allVisibility") }, { value: "public", label: t("publicOnly") }, { value: "private", label: t("privateOnly") }]}
       />
-      <Input value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} placeholder="filter tag" title="Filter by tag" />
       <InlineSelect
         value={sortBy}
         onChange={(value) => setSortBy(value as typeof sortBy)}
-        options={[{ value: "newest", label: "Newest first" }, { value: "score", label: "Score first" }]}
+        options={[{ value: "newest", label: t("newest") }, { value: "score", label: t("score") }]}
       />
     </section>
   );
 }
 
 function SystemHealth({ stats }: { stats: ReturnType<typeof selectStats> }) {
+  const { t } = useLanguage();
   return (
     <section className="side-card health-card">
       <div className="card-title">
         <Activity size={17} />
-        <h3>Repository Health</h3>
+        <h3>{t("repositoryHealth")}</h3>
       </div>
       <div className="health-grid">
-        <Metric label="Objects" value={stats.total} />
+        <Metric label={t("objects")} value={stats.total} />
         <Metric label="Today" value={stats.today} />
-        <Metric label="Tags" value={stats.tags.length} />
+        <Metric label={t("tagsCount")} value={stats.tags.length} />
       </div>
       <div className="mini-signal">
         <Database size={16} />
-        <span>Repository active</span>
+        <span>{t("repositoryActive")}</span>
         <Check size={15} />
       </div>
-      <TagStack tags={stats.tags} />
     </section>
   );
 }
 
-function CollectionsPanel({ memories }: { memories: MemoryObject[] }) {
-  const setQuery = useMemoryStore((state) => state.setQuery);
-  const collections = buildCollections(memories);
+function LanguagePanel() {
+  const { language, setLanguage, t } = useLanguage();
 
   return (
-    <section className="side-card">
+    <section className="side-card language-panel">
       <div className="card-title">
-        <Archive size={17} />
-        <h3>Projects & Topics</h3>
+        <Globe size={17} />
+        <h3>{t("language")}</h3>
       </div>
-      <div className="collection-list">
-        {collections.length ? (
-          collections.map((collection) => (
-            <Button variant="ghost" key={collection.tag} type="button" onClick={() => setQuery(collection.tag)}>
-              <span>#{collection.tag}</span>
-              <strong>{collection.count}</strong>
-            </Button>
-          ))
-        ) : (
-          <p className="empty-note">Capture or import more memories and Mory will cluster them by tag.</p>
-        )}
-      </div>
+      <label className="language-field" htmlFor="settings-language">
+        <Select value={language} onValueChange={(value) => setLanguage(value as Language)}>
+          <SelectTrigger id="settings-language" className="source-trigger language-select-trigger" aria-label={t("language")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="en">{t("english")}</SelectItem>
+            <SelectItem value="zh">{t("chinese")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
     </section>
   );
 }
 
 function GithubSyncCard() {
+  const { t } = useLanguage();
   const { github, updateGithub, mergeGithub, pushGithub, pullGithub, memories } = useMemoryStore();
-  const [backupMessage, setBackupMessage] = useState("");
   const privateCount = memories.filter((memory) => memory.isPrivate).length;
+  const [repositoryUrl, setRepositoryUrl] = useState(() => github.owner && github.repo ? `https://${github.provider || "github"}.com/${github.owner}/${github.repo}` : "");
+  const [connectionState, setConnectionState] = useState<"idle" | "checking" | "success" | "error">("idle");
+  const [connectionMessage, setConnectionMessage] = useState("");
+
+  function updateRepositoryUrl(value: string) {
+    setRepositoryUrl(value);
+    const parsed = parseRepositoryUrl(value);
+    if (!parsed) {
+      setConnectionState("idle");
+      setConnectionMessage("");
+      return;
+    }
+    updateGithub({ owner: parsed.owner, repo: parsed.repo, branch: github.branch || "main", path: github.path || "mory/memories.json" });
+    setConnectionState("idle");
+    setConnectionMessage("");
+  }
+
+  async function checkConnection() {
+    const parsed = parseRepositoryUrl(repositoryUrl);
+    if (!parsed || !github.token.trim()) {
+      setConnectionState("error");
+      setConnectionMessage("请填写正确的仓库地址和 Access token");
+      return;
+    }
+    const provider = repositoryUrl.toLowerCase().includes("gitee.com") ? "gitee" : "github";
+    const config = { ...github, provider, owner: parsed.owner, repo: parsed.repo, branch: github.branch || "main", path: github.path || "mory/memories.json" } as const;
+    updateGithub(config);
+    setConnectionState("checking");
+    setConnectionMessage(t("checkingConnection"));
+    try {
+      const result = await checkGithubConnection(config);
+      updateGithub({ branch: result.branch });
+      setConnectionState("success");
+      setConnectionMessage(`${t("connectionSuccess")}（${result.branch}）`);
+    } catch (error) {
+      setConnectionState("error");
+      setConnectionMessage(error instanceof Error ? error.message : "连接失败");
+    }
+  }
 
   return (
     <section className="side-card sync-card">
       <div className="card-title">
         <Github size={17} />
-        <h3>GitHub Sync</h3>
+        <h3>{t("githubSync")}</h3>
       </div>
-      <div className="sync-grid">
-        <Input value={github.owner} onChange={(event) => updateGithub({ owner: event.target.value })} aria-label="GitHub owner" />
-        <Input value={github.repo} onChange={(event) => updateGithub({ repo: event.target.value })} aria-label="GitHub repo" />
-        <Input value={github.branch} onChange={(event) => updateGithub({ branch: event.target.value })} aria-label="GitHub branch" />
-        <Input value={github.path} onChange={(event) => updateGithub({ path: event.target.value })} aria-label="GitHub sync path" />
+      <div className="sync-layout">
+      <div className="sync-column sync-column-connection">
+      <div className="sync-connection-card">
+      <div className="sync-config-section">
+        <div className="sync-section-heading"><strong>{t("syncConnection")}</strong><span>{t("syncConnectionHint")}</span></div>
+        <label className="language-field" htmlFor="sync-provider">
+          <span>{t("provider")}</span>
+          <Select value={github.provider} onValueChange={(value) => updateGithub({ provider: value as "" | "github" | "gitee" })}>
+            <SelectTrigger id="sync-provider" aria-label={t("provider")}><SelectValue placeholder="请选择服务商" /></SelectTrigger>
+            <SelectContent><SelectItem value="github">GitHub</SelectItem><SelectItem value="gitee">{t("gitee")}</SelectItem></SelectContent>
+          </Select>
+        </label>
+        <label className="sync-field repository-url-field"><span>{t("repositoryUrl")}</span><Input value={repositoryUrl} onChange={(event) => updateRepositoryUrl(event.target.value)} aria-label={t("repositoryUrl")} placeholder="https://github.com/owner/repository" /></label>
+        <div className="connection-access-row">
+        <label className="sync-field"><span>Access token</span><Input className="token-input" type="password" value={github.token} onChange={(event) => updateGithub({ token: event.target.value })} aria-label="Access token" /></label>
+        <label className="sync-field"><span>{t("deviceName")}</span><Input value={github.deviceName} onChange={(event) => updateGithub({ deviceName: event.target.value })} aria-label={t("deviceName")} /></label>
+        </div>
+        <Button className="check-connection-button" variant="outline" type="button" onClick={() => void checkConnection()} disabled={connectionState === "checking" || !parseRepositoryUrl(repositoryUrl) || !github.token.trim()}>
+          <Cable size={16} />
+          {connectionState === "checking" ? t("checkingConnection") : t("checkConnection")}
+        </Button>
+        {connectionMessage ? <div className={connectionState === "error" ? "sync-warning" : "sync-note"}>{connectionMessage}</div> : null}
       </div>
-      <Input className="token-input" type="password" value={github.token} onChange={(event) => updateGithub({ token: event.target.value })} placeholder="GitHub token with contents read/write" />
+      </div>
+      </div>
+      <div className="sync-column sync-column-access">
+      <label className="sync-auto-option">
+        <Input type="checkbox" checked={github.autoSync} onChange={(event) => updateGithub({ autoSync: event.target.checked })} />
+        <span><strong>{t("autoSync")}</strong><small>{t("autoSyncHint")}</small></span>
+      </label>
       <div className={privateCount ? "sync-warning" : "sync-note"}>
-        {privateCount ? `${privateCount} private memories are included in sync/export unless you remove them first.` : "Token is kept in page state and is not restored after refresh."}
+        {privateCount ? `${privateCount} ${t("privateSyncWarning")}` : t("githubTokenNote")}
       </div>
       <div className="sync-actions">
         <Button className="primary-action" type="button" onClick={() => void mergeGithub()}>
           <Cloud size={16} />
-          Merge sync
+          {t("mergePush")}
         </Button>
-        <Button variant="outline" type="button" onClick={() => void pushGithub()} title={`Push ${memories.length} objects`}>
+        <Button variant="outline" type="button" onClick={() => void pushGithub()} aria-label={t("pushRemote")} title={`${t("pushRemote")} (${memories.length})`}>
           <ArrowUpToLine size={16} />
         </Button>
-        <Button variant="outline" type="button" onClick={() => void pullGithub()} title="Pull remote repository">
+        <Button variant="outline" type="button" onClick={() => void pullGithub()} aria-label={t("pullRemote")} title={t("pullRemote")}>
           <ArrowDownToLine size={16} />
         </Button>
       </div>
-      <Button variant="ghost" className="ghost-button sqlite-backup-button" type="button" onClick={async () => {
-        setBackupMessage("Backing up SQLite...");
-        try {
-          const result = await backupRemoteGithub(github);
-          setBackupMessage("SQLite + JSON committed (" + result.count + " memories).");
-        } catch (error) {
-          setBackupMessage(error instanceof Error ? error.message : "SQLite backup failed.");
-        }
-      }}>Commit SQLite backup</Button>
-      {backupMessage ? <p className="sync-note">{backupMessage}</p> : null}
+      <a className="sync-guide-button" href="https://my.feishu.cn/wiki/K4oGwSez3idFgYkhG83cEw2qnDd" target="_blank" rel="noreferrer">
+        <BookOpenCheck size={16} />
+        {t("setupGuide")}
+      </a>
+      </div>
+      </div>
     </section>
   );
 }
 
 function ConnectorRail() {
+  const { t } = useLanguage();
   const connectors = [
-    { icon: <Archive size={17} />, name: "Manual", state: "Active" },
-    { icon: <Clipboard size={17} />, name: "Clipboard", state: "Active" },
-    { icon: <Globe size={17} />, name: "Browser", state: "Active-lite" },
-    { icon: <FileText size={17} />, name: "Files", state: "Planned" },
-    { icon: <Github size={17} />, name: "GitHub", state: "Ready" },
+    { icon: <Archive size={17} />, name: t("manual"), state: t("active") },
+    { icon: <Clipboard size={17} />, name: t("clipboard"), state: t("active") },
+    { icon: <Globe size={17} />, name: t("browser"), state: t("activeLite") },
+    { icon: <FileText size={17} />, name: t("file"), state: t("planned") },
+    { icon: <Github size={17} />, name: t("github"), state: t("ready") },
   ];
 
   return (
     <section className="side-card">
       <div className="card-title">
         <Cable size={17} />
-        <h3>Connectors</h3>
+        <h3>{t("connectorsTitle")}</h3>
       </div>
       <div className="connector-list">
         {connectors.map((connector) => (
@@ -1070,8 +1102,9 @@ function mergeTagText(current: string, tags: string[]): string {
   return Array.from(new Set([...current.split(","), ...tags].map((tag) => tag.trim()).filter(Boolean))).join(", ");
 }
 
-function MemoryCard({ memory, selected, selectionMode, onSelect, onOpen }: { memory: MemoryObject; selected: boolean; selectionMode: boolean; onSelect: (checked: boolean) => void; onOpen: () => void }) {
-  const { setQuery, update, remove } = useMemoryStore();
+function MemoryCard({ memory, selected, onSelect, onOpen }: { memory: MemoryObject; selected: boolean; onSelect: (checked: boolean) => void; onOpen: () => void }) {
+  const { t } = useLanguage();
+  const { github, setKindFilter, update, remove } = useMemoryStore();
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(memory.payload.title);
   const [draftContent, setDraftContent] = useState(memory.payload.content);
@@ -1089,7 +1122,7 @@ function MemoryCard({ memory, selected, selectionMode, onSelect, onOpen }: { mem
 
   return (
     <Card
-      className={["memory-card", selectionMode ? "selection-mode" : "", selected ? "selected" : ""].filter(Boolean).join(" ")}
+      className={["memory-card", selected ? "selected" : ""].filter(Boolean).join(" ")}
       role="button"
       tabIndex={0}
       aria-label={`Open memory: ${memory.payload.title}`}
@@ -1106,15 +1139,13 @@ function MemoryCard({ memory, selected, selectionMode, onSelect, onOpen }: { mem
         onOpen();
       }}
     >
-      {selectionMode ? (
-        <div className="memory-selection-cell">
-          <Input type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked)} aria-label={`Select ${memory.payload.title}`} />
-        </div>
-      ) : null}
-      <div className="memory-time">{relativeTime(memory.capturedAt)}</div>
+      <div className="memory-selection-cell">
+        <Input type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked)} aria-label={`Select ${memory.payload.title}`} />
+      </div>
+      <div className="memory-time">{relativeTime(memory.capturedAt, t)}</div>
       <div className="memory-entity">
-        <strong>{memory.actor?.id || memory.source}</strong>
-        <span>{memory.source}</span>
+        <strong>{github.deviceName || memory.origin?.deviceName || t("untitledMemory")}</strong>
+        <span>{sourceLabel(memory.source, t)}</span>
       </div>
       <div className="memory-content-cell">
       {editing ? (
@@ -1125,41 +1156,38 @@ function MemoryCard({ memory, selected, selectionMode, onSelect, onOpen }: { mem
         </div>
       ) : (
         <>
-          <Button variant="ghost" className="memory-title-button" type="button" onClick={onOpen}>{memory.isPrivate ? "Private memory" : memory.payload.title}</Button>
-          <p>{memory.isPrivate ? "This memory is marked private." : memoryPreview(memory) || memory.payload.content}</p>
+          <Button variant="ghost" className="memory-title-button" type="button" onClick={onOpen}>{memory.isPrivate ? t("privateOnly") : memory.payload.title}</Button>
+          <p>{memory.isPrivate ? t("privateOnly") : memoryPreview(memory) || memory.payload.content}</p>
         </>
       )}
       </div>
       <div className="memory-category">
-        <Button variant="ghost" type="button" onClick={() => setQuery(memory.kind || "note")}>{memory.kind || "note"}</Button>
+        <Button variant="ghost" type="button" onClick={() => setKindFilter(memory.kind || "note")}>{recordLabel(memory.kind, t)}</Button>
         {memory.tags[0] ? <span>#{memory.tags[0]}</span> : null}
       </div>
-        <div className="memory-life"><Badge>Active</Badge><strong>{memory.score}</strong></div>
+        <div className="memory-life"><Badge>{t("active")}</Badge></div>
     </Card>
   );
 }
 
-function relativeTime(value: string): string {
+function relativeTime(value: string, t: (key: TranslationKey) => string): string {
   const delta = Math.max(0, Date.now() - new Date(value).getTime());
   const minutes = Math.floor(delta / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return String(minutes) + "m ago";
+  if (minutes < 1) return t("justNow");
+  if (minutes < 60) return String(minutes) + t("minutesAgo");
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return String(hours) + "h ago";
-  return String(Math.floor(hours / 24)) + "d ago";
+  if (hours < 24) return String(hours) + t("hoursAgo");
+  return String(Math.floor(hours / 24)) + t("daysAgo");
 }
 
 function MemoryDetailDrawer({
   memory,
-  selected,
-  onSelect,
   onClose,
 }: {
   memory: MemoryObject;
-  selected: boolean;
-  onSelect: (checked: boolean) => void;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const { update } = useMemoryStore();
   const [title, setTitle] = useState(memory.payload.title);
   const [content, setContent] = useState(memory.payload.content);
@@ -1178,17 +1206,17 @@ function MemoryDetailDrawer({
 
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside className="memory-drawer" role="dialog" aria-label="Memory details" onMouseDown={(event) => event.stopPropagation()}>
+        <aside className="memory-drawer" role="dialog" aria-label={t("memoryDetail")} onMouseDown={(event) => event.stopPropagation()}>
         <header>
           <div>
-            <span className="eyebrow">Memory Detail</span>
+            <span className="eyebrow">{t("memoryDetail")}</span>
             <h2>{memory.payload.title}</h2>
           </div>
-          <Button variant="outline" type="button" onClick={onClose}>Close</Button>
+          <Button variant="outline" type="button" onClick={onClose}>{t("close")}</Button>
         </header>
         <div className="drawer-grid">
           <label>
-            Title
+            {t("title")}
             <Input value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
           <label>
@@ -1196,23 +1224,23 @@ function MemoryDetailDrawer({
             <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />
           </label>
           <label>
-            Tags
+            {t("tags")}
             <Input value={tags} onChange={(event) => setTags(event.target.value)} />
           </label>
           <label>
-            Raw memory
+            {t("memoryContent")}
             <Textarea value={content} onChange={(event) => setContent(event.target.value)} />
           </label>
         </div>
         <section className="drawer-meta">
-          <span>{recordLabel(memory.kind)}</span>
-          <span>{memory.source}</span>
+          <span>{recordLabel(memory.kind, t)}</span>
+          <span>{sourceLabel(memory.source, t)}</span>
+          {memory.origin?.deviceName ? <span>{memory.origin.deviceName}</span> : null}
           <span>{new Date(memory.capturedAt).toLocaleString()}</span>
-          <span>{memory.contentHash.slice(0, 20)}</span>
         </section>
         {Object.keys(memory.fields ?? {}).length ? (
           <section className="drawer-fields">
-            <strong>Structured Fields</strong>
+            <strong>{t("structuredFields")}</strong>
             <div>
               {Object.entries(memory.fields ?? {}).map(([key, value]) => (
                 <span key={key}>
@@ -1223,22 +1251,14 @@ function MemoryDetailDrawer({
             </div>
           </section>
         ) : null}
-        <section className="drawer-summary">
-          <strong>Preview</strong>
-          <p>{createPreview(content)}</p>
-        </section>
         <div className="drawer-actions">
-          <Button variant="outline" type="button" onClick={() => onSelect(!selected)}>
-            <Archive size={15} />
-            {selected ? "Remove from Pack" : "Add to Pack"}
-          </Button>
           <Button variant="secondary" type="button" onClick={() => void update({ ...memory, isPrivate: !memory.isPrivate })}>
             <Shield size={15} />
-            {memory.isPrivate ? "Make Public" : "Mark Private"}
+            {memory.isPrivate ? t("makePublic") : t("markPrivate")}
           </Button>
           <Button type="button" onClick={() => void save()}>
             <Check size={15} />
-            Save
+            {t("save")}
           </Button>
         </div>
       </aside>
@@ -1247,11 +1267,22 @@ function MemoryDetailDrawer({
 }
 
 function ContextPack({ memories, onClear }: { memories: MemoryObject[]; onClear: () => void }) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<"compact" | "full" | "archive">("compact");
+  const remove = useMemoryStore((state) => state.remove);
   const visibleMemories = memories.filter((memory) => !memory.isPrivate);
   const privateCount = memories.length - visibleMemories.length;
   const text = buildContextPack(visibleMemories, mode);
+
+  async function deleteSelected() {
+    const confirmed = window.confirm(`Delete ${memories.length} selected memor${memories.length === 1 ? "y" : "ies"}? This cannot be undone.`);
+    if (!confirmed) return;
+    for (const memory of memories) {
+      await remove(memory.id);
+    }
+    onClear();
+  }
 
   if (!memories.length) {
     return null;
@@ -1264,16 +1295,23 @@ function ContextPack({ memories, onClear }: { memories: MemoryObject[]; onClear:
           <Archive size={17} />
         </div>
         <div>
-          <strong>Selection Pack</strong>
-          <span>{visibleMemories.length} included. {privateCount ? `${privateCount} private excluded. ` : ""}Copy selected memories as a portable text bundle.</span>
+          <strong>{t("selectionPack")}</strong>
+          <span>{visibleMemories.length} {t("included")}. {privateCount ? `${privateCount} ${t("privateExcluded")}. ` : ""}{t("portableBundle")}</span>
         </div>
       </div>
       <div className="context-actions">
+        <Button variant="outline" type="button" onClick={onClear} title={t("clearPack")}>
+          {t("clearSelection")}
+        </Button>
         <InlineSelect
           value={mode}
           onChange={(value) => setMode(value as typeof mode)}
-          options={[{ value: "compact", label: "Compact" }, { value: "full", label: "Full" }, { value: "archive", label: "Archive" }]}
+          options={[{ value: "compact", label: t("compact") }, { value: "full", label: t("full") }, { value: "archive", label: t("archive") }]}
         />
+        <Button variant="destructive" type="button" onClick={() => void deleteSelected()} title={t("deleteSelected")}>
+          <Trash2 size={15} />
+          {t("delete")}
+        </Button>
         <Button
           type="button"
           onClick={() => {
@@ -1281,13 +1319,10 @@ function ContextPack({ memories, onClear }: { memories: MemoryObject[]; onClear:
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1400);
           }}
-          title="Copy selected memories as a structured text bundle"
+          title={t("copyBundle")}
         >
           {copied ? <Check size={15} /> : <Clipboard size={15} />}
-          {copied ? "Copied" : "Copy pack"}
-        </Button>
-        <Button variant="outline" type="button" onClick={onClear} title="Remove all memories from the current selection pack">
-          Clear
+          {copied ? t("copied") : t("copyPack")}
         </Button>
       </div>
     </section>
@@ -1295,6 +1330,7 @@ function ContextPack({ memories, onClear }: { memories: MemoryObject[]; onClear:
 }
 
 function BookmarkImport() {
+  const { t } = useLanguage();
   const importMany = useMemoryStore((state) => state.importMany);
 
   async function importBookmarks(file: File) {
@@ -1317,9 +1353,9 @@ function BookmarkImport() {
   }
 
   return (
-    <label className="bookmark-import" title="Import Chrome or Edge exported bookmarks HTML">
+    <label className="bookmark-import">
       <FileText size={16} />
-      Import bookmarks
+      {t("importBookmarks")}
       <Input type="file" accept=".html,.htm,text/html" onChange={(event) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -1332,6 +1368,7 @@ function BookmarkImport() {
 }
 
 function TextImport() {
+  const { t } = useLanguage();
   const importMany = useMemoryStore((state) => state.importMany);
 
   async function importText(file: File) {
@@ -1348,9 +1385,9 @@ function TextImport() {
   }
 
   return (
-    <label className="bookmark-import" title="Import Markdown or plain text files">
+    <label className="bookmark-import">
       <Upload size={16} />
-      Import text
+      {t("importText")}
       <Input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={(event) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -1363,6 +1400,7 @@ function TextImport() {
 }
 
 function JsonExport({ memories }: { memories: MemoryObject[] }) {
+  const { t } = useLanguage();
   function exportJson() {
     const blob = new Blob([JSON.stringify({ schemaVersion: 1, exportedAt: new Date().toISOString(), memories }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -1374,14 +1412,14 @@ function JsonExport({ memories }: { memories: MemoryObject[] }) {
   }
 
   return (
-    <Button variant="outline" type="button" onClick={exportJson} title="Export memories">
-      <Download size={16} />
-      Export
+      <Button variant="outline" className="export-action" type="button" onClick={exportJson} aria-label={t("exportMemories")} title={t("exportMemories")}>
+      <ArrowDownToLine size={18} strokeWidth={2} />
     </Button>
   );
 }
 
 function JsonImport() {
+  const { t } = useLanguage();
   const importMany = useMemoryStore((state) => state.importMany);
   const [error, setError] = useState("");
 
@@ -1461,9 +1499,9 @@ function JsonImport() {
   }
 
   return (
-    <label className="bookmark-import" title="Import a Mory JSON export">
+    <label className="bookmark-import">
       <Upload size={16} />
-      Import JSON
+      {t("importJson")}
       <Input type="file" accept=".json,application/json" onChange={(event) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -1486,13 +1524,14 @@ function Metric({ label, value }: { label: string; value: number }) {
 }
 
 function TagStack({ tags }: { tags: Array<{ tag: string; count: number }> }) {
+  const { t } = useLanguage();
   const setQuery = useMemoryStore((state) => state.setQuery);
 
   if (!tags.length) {
     return (
       <div className="tag-stack empty">
         <Link size={15} />
-        <span>Tags will emerge as you capture.</span>
+        <span>{t("tagsEmerge")}</span>
       </div>
     );
   }
@@ -1509,10 +1548,13 @@ function TagStack({ tags }: { tags: Array<{ tag: string; count: number }> }) {
   );
 }
 
-function StatusChip({ label, tone }: { label: string; tone: "good" | "neutral" }) {
+function StatusChip({ label, status }: { label: string; status: "local" | "syncing" | "synced" | "error" }) {
   return (
-    <span className={`status-chip ${tone}`}>
-      {tone === "good" ? <LockKeyhole size={14} /> : <Archive size={14} />}
+    <span className={`status-chip ${status}`}>
+      {status === "syncing" ? <RefreshCw size={14} className="status-chip-spin" /> : null}
+      {status === "synced" ? <CloudCheck size={14} /> : null}
+      {status === "error" ? <CloudOff size={14} /> : null}
+      {status === "local" ? <Archive size={14} /> : null}
       {label}
     </span>
   );
@@ -1558,9 +1600,44 @@ function recordIcon(kind?: MemoryKind) {
   return <Archive size={17} />;
 }
 
-function recordLabel(kind?: MemoryKind): string {
+function recordLabel(kind?: MemoryKind, translate?: (key: TranslationKey) => string): string {
   const found = recordModes.find((mode) => mode.kind === kind);
-  return found?.label ?? "Note";
+  if (!translate) return found?.label ?? "Note";
+  const keys: Partial<Record<MemoryKind, TranslationKey>> = { note: "note", chat: "chat", bill: "bill", finance: "finance", task: "task", waiting: "waiting", bookmark: "bookmark", file: "file", decision: "decision", log: "log" };
+  return translate(keys[kind ?? "note"] ?? "note");
+}
+
+function ThemePanel() {
+  const { theme, setTheme } = useTheme();
+  const { t } = useLanguage();
+
+  return (
+    <section className="theme-panel" aria-labelledby="theme-panel-title">
+      <div className="card-title"><Palette size={17} /><h3 id="theme-panel-title">{t("theme")}</h3></div>
+      <div className="theme-options" role="radiogroup" aria-label={t("theme")}>
+        {themes.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`theme-option ${theme === item.id ? "selected" : ""}`}
+            onClick={() => setTheme(item.id)}
+            role="radio"
+            aria-checked={theme === item.id}
+          >
+            <span className="theme-swatches" aria-hidden="true">
+              {item.swatches.map((color) => <span key={color} style={{ backgroundColor: color }} />)}
+            </span>
+            <span className="theme-option-copy"><strong>{t(`theme${capitalize(item.id)}` as TranslationKey)}</strong><small>{t(`theme${capitalize(item.id)}Hint` as TranslationKey)}</small></span>
+            <span className="theme-check" aria-hidden="true">{theme === item.id ? "✓" : ""}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function recordHint(kind?: MemoryKind): string {
@@ -1568,84 +1645,84 @@ function recordHint(kind?: MemoryKind): string {
   return found?.hint ?? "Freeform memory";
 }
 
-function titlePlaceholder(kind: MemoryKind): string {
+function titlePlaceholder(kind: MemoryKind, t: (key: TranslationKey) => string): string {
   if (kind === "chat") {
-    return "Conversation title, or leave it for Mory to infer";
+    return t("conversationTitlePlaceholder");
   }
 
   if (kind === "bill") {
-    return "Bill title, project, or subscription name";
+    return t("billTitlePlaceholder");
   }
 
   if (kind === "bookmark") {
-    return "Page title, article name, or reference label";
+    return t("bookmarkTitlePlaceholder");
   }
 
   if (kind === "finance") {
-    return "Financial record title, account, asset, or transaction";
+    return t("financeTitlePlaceholder");
   }
 
   if (kind === "task") {
-    return "Task title or action item";
+    return t("taskTitlePlaceholder");
   }
 
   if (kind === "waiting") {
-    return "Waiting item or follow-up title";
+    return t("waitingTitlePlaceholder");
   }
 
   if (kind === "file") {
-    return "Document title or file reference";
+    return t("fileTitlePlaceholder");
   }
 
   if (kind === "decision") {
-    return "Decision title";
+    return t("decisionTitlePlaceholder");
   }
 
   if (kind === "log") {
-    return "Log title, habit, day, project, or event";
+    return t("logTitlePlaceholder");
   }
 
-  return "Give this memory a name, or leave it for Mory to infer";
+  return t("noteTitlePlaceholder");
 }
 
-function contentPlaceholder(kind: MemoryKind): string {
+function contentPlaceholder(kind: MemoryKind, t: (key: TranslationKey) => string): string {
   if (kind === "chat") {
-    return "Write messages, decisions, or conversation fragments. Example:\nMe: ...\nPartner: ...";
+    return t("chatContentPlaceholder");
   }
 
   if (kind === "bill") {
-    return "Optional bill note: why it happened, project relation, receipt detail, reimbursement status...";
+    return t("billContentPlaceholder");
   }
 
   if (kind === "bookmark") {
-    return "Optional page note: why this link matters, what to remember, related project...";
+    return t("bookmarkContentPlaceholder");
   }
 
   if (kind === "finance") {
-    return "Optional finance note: why it changed, source, account detail, tax/reimbursement context...";
+    return t("financeContentPlaceholder");
   }
 
   if (kind === "task") {
-    return "Describe the task, acceptance criteria, blockers, or next step...";
+    return t("taskContentPlaceholder");
   }
 
   if (kind === "waiting") {
-    return "Record what you are waiting for, what happened, and when to follow up...";
+    return t("waitingContentPlaceholder");
   }
 
   if (kind === "file") {
-    return "Describe what this file contains, where it belongs, and why it matters...";
+    return t("fileContentPlaceholder");
   }
 
   if (kind === "decision") {
-    return "Record the decision, options considered, reason, owner, and consequences...";
+    return t("decisionContentPlaceholder");
   }
 
   if (kind === "log") {
-    return "Write what happened, metrics, state, observation, or timeline notes...";
+    return t("logContentPlaceholder");
   }
 
-  return "Paste a decision, page note, meeting context, link, or fragment worth remembering.";
+  return t("noteContentPlaceholder");
 }
 
 function ScenePreview({ memory }: { memory: MemoryObject }) {
@@ -1757,26 +1834,34 @@ function safeHostname(url?: string): string {
 }
 
 function Notice({ text, tone, onRetry }: { text: string; tone: "good" | "bad"; onRetry?: () => void }) {
+  const { t } = useLanguage();
   return (
     <div className={`notice ${tone}`} role={tone === "bad" ? "alert" : "status"} aria-live={tone === "bad" ? "assertive" : "polite"} aria-atomic="true">
-      <span>{text}</span>
-      {onRetry ? <Button variant="outline" type="button" onClick={onRetry}>Retry</Button> : null}
+      <span>{localizeMessage(text, t)}</span>
+      {onRetry ? <Button variant="outline" type="button" onClick={onRetry}>{t("retry")}</Button> : null}
     </div>
   );
 }
 
-function buildCollections(memories: MemoryObject[]): Array<{ tag: string; count: number }> {
-  const counts = new Map<string, number>();
-  for (const memory of memories) {
-    for (const tag of memory.tags) {
-      counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-  }
-  return Array.from(counts.entries())
-    .filter(([, count]) => count >= 2)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 8)
-    .map(([tag, count]) => ({ tag, count }));
+function localizeMessage(message: string, t: (key: TranslationKey) => string): string {
+  const exact: Array<[string, TranslationKey]> = [
+    ["Failed to load memories.", "loadFailed"], ["Failed to save memory.", "saveFailed"], ["Import failed.", "importFailed"],
+    ["GitHub sync needs token, owner, repo, branch and path.", "githubConfig"], ["Pushing memories to GitHub...", "pushing"], ["Pulling memories from GitHub...", "pulling"], ["Merging local and GitHub memories...", "merging"],
+    ["GitHub push failed.", "githubPushFailed"], ["GitHub pull failed.", "githubPullFailed"], ["GitHub merge failed.", "githubMergeFailed"],
+  ];
+  const match = exact.find(([source]) => message === source);
+  if (match) return t(match[1]);
+  const pushed = message.match(/^Pushed (\d+) memory objects to (GitHub|Gitee)\.$/);
+  if (pushed) return t("pushedObjects").replace("{count}", pushed[1]).replace("{provider}", pushed[2]);
+  const pulled = message.match(/^Pulled (\d+) memory objects from (GitHub|Gitee)\.$/);
+  if (pulled) return t("pulledObjects").replace("{count}", pulled[1]).replace("{provider}", pulled[2]);
+  const merged = message.match(/^Merged and pushed (\d+) memory objects\.$/);
+  if (merged) return t("mergedObjects").replace("{count}", merged[1]);
+  return message;
+}
+
+function isBackgroundSyncError(message: string): boolean {
+  return /github|gitee|remote memory|memory file|sync|sha|does not match|409|401|403|404|SYNC_CONFLICT/i.test(message);
 }
 
 function buildContextPack(memories: MemoryObject[], mode: "compact" | "full" | "archive"): string {

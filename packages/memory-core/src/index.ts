@@ -20,6 +20,11 @@ export type MemorySource =
   | "chat"
   | "github";
 
+export interface MemoryOrigin {
+  deviceId: string;
+  deviceName: string;
+}
+
 export interface MemoryPayload {
   title: string;
   content: string;
@@ -31,6 +36,7 @@ export interface MemoryObject {
   type: MemoryType;
   source: MemorySource;
   capturedAt: string;
+  updatedAt?: string;
   contentHash: string;
   payload: MemoryPayload;
   kind?: MemoryKind;
@@ -44,6 +50,7 @@ export interface MemoryObject {
   parentIds?: string[];
   schemaVersion: number;
   actor?: { type: "human" | "agent" | "ai" | "plugin"; id?: string };
+  origin?: MemoryOrigin;
 }
 
 export interface CreateMemoryInput {
@@ -139,14 +146,13 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryObje
   const detectedUrl = input.url?.trim() || extractUrls(`${title} ${content}`)[0];
   const fields = cleanFields(input.fields ?? {});
   const contentHash = await sha256(JSON.stringify({ source, kind, title, content, url: detectedUrl ?? "", fields }));
-  const urlTag = detectedUrl ? domainTag(detectedUrl) : undefined;
-  const autoTags = suggestTags(`${title} ${content} ${Object.values(fields).join(" ")}`);
 
   return {
     id: crypto.randomUUID(),
     type,
     source,
     capturedAt,
+    updatedAt: capturedAt,
     contentHash,
     payload: {
       title,
@@ -155,7 +161,9 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryObje
     },
     kind,
     fields,
-    tags: normalizeTags([kind, ...(input.tags ?? []), source === "browser" ? "browser" : "", urlTag ?? "", ...autoTags]),
+    // Tags are explicit user metadata. Do not infer them from the record kind,
+    // source, URL, title, or content.
+    tags: normalizeTags(input.tags ?? []),
     score: Math.min(100, Math.max(1, Math.round(content.length / 12) + 20)),
     preview: createPreview(content),
     isPrivate: input.isPrivate ?? false,
