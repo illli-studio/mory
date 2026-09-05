@@ -9,7 +9,7 @@
 <p>
 
 <img src="https://img.shields.io/badge/Local--First-✓-2ea44f" />
-<img src="https://img.shields.io/badge/Open%20Source-MIT-blue" />
+<img src="https://img.shields.io/badge/Open%20Source-AGPLv3-blue" />
 <img src="https://img.shields.io/badge/AI%20Native-Memory-purple" />
 <img src="https://img.shields.io/badge/Status-Early%20Development-orange" />
 
@@ -282,13 +282,44 @@ Your second brain grows naturally over time.
 
 ## Agent memory service
 
-The web app can connect to the shared Mory API from the `Mory API` panel. Start it with:
+Mory can run as a single local service that serves both the web console and the API:
 
 ```bash
-MORY_API_TOKEN=choose-a-token pnpm api:dev
+npm install -g @illli-studio/mory
+mory init
+mory start
 ```
 
-Then enter the API URL and the same token in the web app. Hermes can use the adapter in `plugins/hermes` with `MORY_API_URL` and `MORY_API_TOKEN`; both clients write to the same SQLite repository. The API stores append-oriented memory records, hash-deduplicates exact repeats, keeps event history, supports BM25/entity search, and uses tombstone deletes.
+To keep the service running while returning to your shell:
+
+```bash
+mory start --background
+mory status
+```
+
+Data can be moved between machines without touching the SQLite file directly:
+
+```bash
+mory export ./mory-export.json
+mory import ./mory-export.json
+```
+
+The default data directory is `~/.mory` (or the platform equivalent). The website and all local agents use the same SQLite repository. The API stores append-oriented memory records, hash-deduplicates exact repeats, keeps event history, supports BM25/entity search, and uses tombstone deletes.
+
+Mory also exposes a generic MCP server over stdio. Add this to an MCP-compatible agent:
+
+```json
+{
+  "mcpServers": {
+    "mory": {
+      "command": "mory",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Available tools are `mory_remember`, `mory_search`, `mory_context`, `mory_get`, `mory_list`, `mory_update`, and `mory_forget`. TypeScript integrations can use `@illli-studio/mory/client`.
 
 The GitHub Sync panel can commit both `mory/mory.sqlite` and a readable `mory/memories.json` snapshot. GitHub is a versioned backup target; the running SQLite file remains the source of truth.
 
@@ -303,6 +334,14 @@ Memory will not.
 The future belongs to AI that truly understands its user.
 
 Mory exists to build that memory.
+
+## License
+
+Mory is available under the GNU Affero General Public License v3.0 or later
+for community use. Organizations that need to use Mory in a proprietary,
+closed-source, or differently licensed product should obtain a separate
+commercial license. See [LICENSE](./LICENSE) and
+[LICENSE-COMMERCIAL.md](./LICENSE-COMMERCIAL.md).
 
 ---
 

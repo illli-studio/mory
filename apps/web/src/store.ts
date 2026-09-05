@@ -60,8 +60,13 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   async load() {
     set({ isLoading: true, error: undefined });
     try {
-      set({ memories: (await loadMemories()).map(normalizeMemory), isLoading: false });
-      if (hasGithubConfig(get().github) && get().github.autoSync) void get().mergeGithub();
+      const loaded = (await loadMemories()).map(normalizeMemory);
+      set({ memories: loaded, isLoading: false });
+      // A newly installed runtime can have an empty SQLite repository while the
+      // configured GitHub repository already contains the user's memories. Do a
+      // one-time merge in that case so switching storage backends does not hide
+      // the remote history. Existing local data still respects autoSync.
+      if (hasGithubConfig(get().github) && (get().github.autoSync || loaded.length === 0)) void get().mergeGithub();
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load memories.", isLoading: false });
     }
@@ -148,8 +153,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
         queueConflictRetry(get);
         return;
       }
-      set({ error: undefined, syncMessage: undefined });
-      queueConflictRetry(get);
+      set({ error: error instanceof Error ? error.message : "GitHub push failed.", syncMessage: undefined });
     } finally {
       syncInFlight = false;
     }
@@ -187,8 +191,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       const normalized = memories.map(normalizeMemory);
       set({ memories: normalized, syncMessage: `Pulled ${normalized.length} memory objects from ${github.provider === "gitee" ? "Gitee" : "GitHub"}.` });
     } catch (error) {
-      set({ error: undefined, syncMessage: undefined });
-      queueConflictRetry(get);
+      set({ error: error instanceof Error ? error.message : "GitHub pull failed.", syncMessage: undefined });
     } finally {
       syncInFlight = false;
     }
@@ -224,8 +227,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
         queueConflictRetry(get);
         return;
       }
-      set({ error: undefined, syncMessage: undefined });
-      queueConflictRetry(get);
+      set({ error: error instanceof Error ? error.message : "GitHub merge failed.", syncMessage: undefined });
     } finally {
       syncInFlight = false;
     }
@@ -330,12 +332,6 @@ function matchesTimeRange(capturedAt: string, range: MemoryState["timeRange"], n
 
 function loadGithubConfig(): GithubSyncConfig {
   try {
-    const resetMarker = "mory.github.empty-config.v1";
-    if (!localStorage.getItem(resetMarker)) {
-      localStorage.removeItem("mory.github");
-      localStorage.setItem(resetMarker, "1");
-      return { ...defaultGithubConfig };
-    }
     const saved = JSON.parse(localStorage.getItem("mory.github") ?? "{}") as Partial<GithubSyncConfig>;
     return { ...defaultGithubConfig, ...saved };
   } catch {

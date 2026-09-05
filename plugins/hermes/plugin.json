@@ -1,8 +1,0 @@
-{
-  "name": "mory-memory",
-  "version": "0.1.0",
-  "description": "Store and retrieve durable project memories through Mory.",
-  "entrypoint": "mory_backend.py",
-  "tools": ["remember", "search", "context", "forget"],
-  "environment": ["MORY_API_URL", "MORY_API_TOKEN"]
-}

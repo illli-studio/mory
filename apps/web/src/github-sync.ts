@@ -15,7 +15,7 @@ export class SyncConflictError extends Error {
 
 export const defaultSyncEnvelope = (memories: MemoryObject[], tombstones: string[] = []): SyncEnvelope => ({ schemaVersion: 2, exportedAt: new Date().toISOString(), memories, tombstones });
 
-export function normalizeGithubConfig(config: GithubSyncConfig): GithubSyncConfig { return { provider: config.provider ?? "", token: config.token.trim(), owner: config.owner.trim(), repo: config.repo.trim(), branch: config.branch.trim(), path: config.path.trim(), autoSync: Boolean(config.autoSync), deviceName: config.deviceName.trim() }; }
+export function normalizeGithubConfig(config: GithubSyncConfig): GithubSyncConfig { return { provider: config.provider ?? "", token: config.token.trim(), owner: config.owner.trim(), repo: config.repo.trim(), branch: config.branch.trim() || "main", path: config.path.trim() || "mory/memories.json", autoSync: Boolean(config.autoSync), deviceName: config.deviceName.trim() }; }
 export function hasGithubConfig(config: GithubSyncConfig): boolean { const next = normalizeGithubConfig(config); return Boolean(next.token && next.owner && next.repo && next.branch && next.path); }
 
 export function parseRepositoryUrl(value: string): RepositoryConnection | null {
@@ -36,7 +36,7 @@ export async function checkGithubConnection(config: GithubSyncConfig): Promise<{
   return { branch: repository.default_branch ?? "main" };
 }
 
-export async function pullGithubSnapshot(config: GithubSyncConfig): Promise<SyncEnvelope> { const normalized = normalizeGithubConfig(config); const file = await fetchRemoteFile(normalized); if (!file) return defaultSyncEnvelope([]); const parsed = JSON.parse(decodeBase64(file.content)) as Partial<SyncEnvelope> | MemoryObject[]; if (Array.isArray(parsed)) return defaultSyncEnvelope(parsed); return { schemaVersion: 2, exportedAt: parsed.exportedAt ?? new Date().toISOString(), memories: Array.isArray(parsed.memories) ? parsed.memories : [], tombstones: Array.isArray(parsed.tombstones) ? parsed.tombstones : [] }; }
+export async function pullGithubSnapshot(config: GithubSyncConfig): Promise<SyncEnvelope> { const normalized = normalizeGithubConfig(config); const file = await fetchRemoteFile(normalized); if (!file) throw new Error(`GitHub memory file not found: ${normalized.path}`); const parsed = JSON.parse(decodeBase64(file.content)) as Partial<SyncEnvelope> | MemoryObject[]; if (Array.isArray(parsed)) return defaultSyncEnvelope(parsed); return { schemaVersion: 2, exportedAt: parsed.exportedAt ?? new Date().toISOString(), memories: Array.isArray(parsed.memories) ? parsed.memories : [], tombstones: Array.isArray(parsed.tombstones) ? parsed.tombstones : [] }; }
 export async function pullGithubMemories(config: GithubSyncConfig): Promise<MemoryObject[]> { return (await pullGithubSnapshot(config)).memories; }
 
 export async function pushGithubMemories(config: GithubSyncConfig, memories: MemoryObject[], tombstones: string[] = []): Promise<SyncResult> {

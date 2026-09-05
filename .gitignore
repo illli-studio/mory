@@ -8,3 +8,9 @@ dist/
 *.local
 tmp/
 apps/api/data/
+.mory/
+.mory-check/
+mory-*.tgz
+illli-studio-mory-*.tgz
+.pack-check/
+packages/mory-runtime/bundle/

@@ -1,0 +1,23 @@
+{
+  "name": "@illli-studio/mory",
+  "version": "0.1.14",
+  "description": "Local-first memory runtime with a web console and MCP server.",
+  "license": "AGPL-3.0-or-later",
+  "publishConfig": { "access": "public" },
+  "type": "module",
+  "bin": {
+    "mory": "./bin/mory"
+  },
+  "exports": {
+    ".": { "types": "./client/index.d.ts", "import": "./client/index.js" },
+    "./client": { "types": "./client/index.d.ts", "import": "./client/index.js" },
+    "./package.json": "./package.json"
+  },
+  "files": ["bin", "src", "bundle", "client", "README.md"],
+  "scripts": {
+    "cli": "node src/cli.mjs",
+    "start": "node src/cli.mjs start",
+    "prepack": "node scripts/prepack.mjs"
+  },
+  "engines": { "node": ">=22" }
+}
