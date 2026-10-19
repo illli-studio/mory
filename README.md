@@ -275,6 +275,10 @@ use your memories:
 
 Keep the local Mory service running while your assistant uses it.
 
+Install the companion [mory-memory skill](docs/SKILLS.md) to guide your assistant
+on when to recall context, save decisions, correct memories, or forget them.
+The skill uses the MCP tools and requires the connection above.
+
 </details>
 
 For background operation, moving data, web deployment, or contributing code,

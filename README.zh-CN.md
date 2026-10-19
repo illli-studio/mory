@@ -271,6 +271,9 @@ mory start
 
 助手使用 Mory 时，请保持本地 Mory 服务运行。
 
+还可以安装配套的 [mory-memory Skill](docs/SKILLS.md)，让助手知道什么时候
+检索过往、保存决定、修订或忘记记忆。Skill 使用现有 MCP 工具，需先完成上述连接。
+
 </details>
 
 有关后台运行、数据迁移、网页部署或贡献代码，

@@ -51,6 +51,10 @@ Mory also exposes a generic MCP server over stdio. Add this to an MCP-compatible
 
 Available tools are `mory_remember`, `mory_search`, `mory_context`, `mory_get`, `mory_list`, `mory_update`, and `mory_forget`. TypeScript integrations can use `@illli-studio/mory/client`.
 
+For assistant guidance on when and how to use these tools, install the
+[`mory-memory` Agent Skill](SKILLS.md). The skill complements the MCP connection;
+it does not replace the local service or automatically access hosted web data.
+
 The web Sync panel merges JSON snapshots with persistent tombstones. Conflicting
 versions are retained as separate copies. The API can additionally back up both
 `mory/mory.sqlite` and a full JSON archive in one GitHub commit to a private
