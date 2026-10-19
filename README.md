@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="https://mory.cloud/"><img src="https://img.shields.io/badge/Website-mory.cloud-0B3B32?style=flat-square&amp;logo=googlechrome&amp;logoColor=white" alt="Website: mory.cloud"></a>
+  <a href="https://me.mory.cloud/"><img src="https://img.shields.io/badge/Try_online-me.mory.cloud-2C6870?style=flat-square" alt="Try online: me.mory.cloud"></a>
   <a href="#get-started"><img src="https://img.shields.io/badge/Get_started-0B3B32?style=flat-square" alt="Get started"></a>
   <a href="docs/GETTING_STARTED.md"><img src="https://img.shields.io/badge/Docs-2C6870?style=flat-square" alt="Documentation"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPLv3-64856B?style=flat-square" alt="License: AGPLv3"></a>
@@ -236,6 +237,13 @@ Automatic capture from your everyday apps and a richer understanding of your
 projects are still on the roadmap.
 
 ## Get started
+
+### Use online
+
+Open [me.mory.cloud](https://me.mory.cloud/) to try Mory and use it directly in
+your browser. No installation needed.
+
+### Run on your device
 
 Install [Node.js 22.18 or newer](https://nodejs.org/), then run:
 

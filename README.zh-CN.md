@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="https://mory.cloud/"><img src="https://img.shields.io/badge/官网-mory.cloud-0B3B32?style=flat-square&amp;logo=googlechrome&amp;logoColor=white" alt="官网：mory.cloud"></a>
+  <a href="https://me.mory.cloud/"><img src="https://img.shields.io/badge/在线体验-me.mory.cloud-2C6870?style=flat-square" alt="在线体验：me.mory.cloud"></a>
   <a href="#开始使用"><img src="https://img.shields.io/badge/开始使用-0B3B32?style=flat-square" alt="开始使用"></a>
   <a href="docs/GETTING_STARTED.md"><img src="https://img.shields.io/badge/文档-2C6870?style=flat-square" alt="文档"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/许可证-AGPLv3-64856B?style=flat-square" alt="许可证：AGPLv3"></a>
@@ -234,6 +235,12 @@ Mory 目前处于**早期开发阶段**。上面的愿景指引着我们正在�
 从日常应用自动采集内容，以及对项目建立更丰富的理解，仍在路线图中。
 
 ## 开始使用
+
+### 在线使用
+
+打开 [me.mory.cloud](https://me.mory.cloud/)，就能在浏览器中体验并直接使用 Mory，无需安装。
+
+### 在自己的设备上运行
 
 安装 [Node.js 22.18 或更新版本](https://nodejs.org/)，然后运行：
 
