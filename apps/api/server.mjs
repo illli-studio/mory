@@ -1,46 +1,132 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { randomBytes,randomUUID,timingSafeEqual } from "node:crypto";
+import { mkdir,readFile } from "node:fs/promises";
+import { dirname,resolve,sep } from "node:path";
 import { createServer } from "node:http";
-import { DatabaseSync } from "node:sqlite";
+import { openRepository,RepositoryError } from "./repository.mjs";
+import { backupGithub } from "./github-backup.mjs";
 
-const port = Number(process.env.MORY_PORT || 8787);
-const token = process.env.MORY_API_TOKEN || randomBytes(24).toString("hex");
-const databasePath = resolve(process.env.MORY_DATABASE || "./data/mory.sqlite");
-const webDist = process.env.MORY_WEB_DIST ? resolve(process.env.MORY_WEB_DIST) : undefined;
-const schemaVersion = 1;
-await mkdir(dirname(databasePath), { recursive: true });
-const db = new DatabaseSync(databasePath);
-db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
-db.exec("CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS memories (id TEXT PRIMARY KEY, text TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL, actor_type TEXT, actor_id TEXT, scope_json TEXT NOT NULL, metadata_json TEXT NOT NULL, tags_json TEXT NOT NULL, hash TEXT NOT NULL, confidence REAL NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, source_event_ids_json TEXT NOT NULL, embedding_json TEXT); CREATE INDEX IF NOT EXISTS memories_hash_idx ON memories(hash); CREATE TABLE IF NOT EXISTS raw_events (id TEXT PRIMARY KEY, content TEXT NOT NULL, source TEXT, actor_json TEXT, scope_json TEXT NOT NULL, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, type TEXT NOT NULL, memory_id TEXT, source_event_id TEXT, old_hash TEXT, new_hash TEXT, actor_json TEXT, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS relations (id TEXT PRIMARY KEY, from_memory_id TEXT NOT NULL, to_memory_id TEXT NOT NULL, type TEXT NOT NULL, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS entities (id TEXT PRIMARY KEY, name TEXT NOT NULL, normalized TEXT NOT NULL UNIQUE, entity_type TEXT NOT NULL, linked_memory_ids_json TEXT NOT NULL); CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(memory_id UNINDEXED, title, text, tags);");
-const storedSchemaVersion = Number(db.prepare("SELECT value FROM schema_meta WHERE key = 'schemaVersion'").get()?.value || 0);
-if (storedSchemaVersion > schemaVersion) throw new Error(`Mory database schema ${storedSchemaVersion} is newer than this runtime supports (${schemaVersion}).`);
-if (storedSchemaVersion < schemaVersion) db.prepare("INSERT INTO schema_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run("schemaVersion", String(schemaVersion));
-const readJson = (value, fallback) => { try { return JSON.parse(value); } catch { return fallback; } };
-const normalize = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
-const digest = (value) => createHash("sha256").update(value).digest("hex");
-const actor = (value) => value || { type: "agent", id: "api" };
-function rowMemory(row) { return row && { id: row.id, text: row.text, title: row.title, kind: row.kind, source: row.source, actor: { type: row.actor_type || "agent", id: row.actor_id || undefined }, scope: readJson(row.scope_json, {}), metadata: readJson(row.metadata_json, {}), tags: readJson(row.tags_json, []), hash: row.hash, confidence: row.confidence, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at, sourceEventIds: readJson(row.source_event_ids_json, []), embedding: readJson(row.embedding_json, undefined) }; }
-function makeMemory(input, fallbackSource) { const text = String(input.text || input.content || input.payload?.content || "").trim(); if (!text) throw new Error("text is required"); const title = String(input.title || input.payload?.title || text.slice(0, 72)).trim(); const now = new Date().toISOString(); return { id: input.id || randomUUID(), text, title, kind: input.kind || "note", source: input.source || fallbackSource || "api", actor: actor(input.actor), scope: input.scope || {}, metadata: input.metadata || input.fields || {}, tags: Array.isArray(input.tags) ? input.tags : [], hash: input.hash || input.contentHash || digest(normalize(title + "\n" + text)), confidence: Number(input.confidence ?? 1), status: input.status || "active", createdAt: input.createdAt || now, updatedAt: now, sourceEventIds: input.sourceEventIds || [], embedding: input.embedding }; }
-function inScope(memory, scope) { return Object.entries(scope || {}).every(([key, value]) => !value || memory.scope?.[key] === value); }
-function allMemories(scope) { return db.prepare("SELECT * FROM memories WHERE status = 'active' ORDER BY updated_at DESC").all().map(rowMemory).filter((memory) => inScope(memory, scope)); }
-function getMemory(id) { return rowMemory(db.prepare("SELECT * FROM memories WHERE id = ?").get(id)); }
-function insert(memory) { db.prepare("INSERT INTO memories (id,text,title,kind,source,actor_type,actor_id,scope_json,metadata_json,tags_json,hash,confidence,status,created_at,updated_at,source_event_ids_json,embedding_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(memory.id, memory.text, memory.title, memory.kind, memory.source, memory.actor.type, memory.actor.id || null, JSON.stringify(memory.scope), JSON.stringify(memory.metadata), JSON.stringify(memory.tags), memory.hash, memory.confidence, memory.status, memory.createdAt, memory.updatedAt, JSON.stringify(memory.sourceEventIds), memory.embedding ? JSON.stringify(memory.embedding) : null); db.prepare("INSERT INTO memory_fts(memory_id,title,text,tags) VALUES (?,?,?,?)").run(memory.id, memory.title, memory.text, memory.tags.join(" ")); }
-function addEvent(type, memory, extra = {}) { db.prepare("INSERT INTO events(id,type,memory_id,source_event_id,old_hash,new_hash,actor_json,created_at) VALUES (?,?,?,?,?,?,?,?)").run(randomUUID(), type, memory?.id || null, extra.sourceEventId || null, extra.oldHash || null, extra.newHash || null, JSON.stringify(memory?.actor || extra.actor || {}), new Date().toISOString()); }
-function linkEntities(memory) { for (const name of [...new Set(memory.text.match(/\b[A-Z][A-Za-z0-9_-]{2,}\b/g) || [])].slice(0, 20)) { const normalized = normalize(name); const existing = db.prepare("SELECT * FROM entities WHERE normalized = ?").get(normalized); if (existing) { const ids = new Set(readJson(existing.linked_memory_ids_json, [])); ids.add(memory.id); db.prepare("UPDATE entities SET linked_memory_ids_json = ? WHERE id = ?").run(JSON.stringify([...ids]), existing.id); } else db.prepare("INSERT INTO entities(id,name,normalized,entity_type,linked_memory_ids_json) VALUES (?,?,?,?,?)").run(randomUUID(), name, normalized, "concept", JSON.stringify([memory.id])); } }
-function cosine(a, b) { if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || !a.length) return 0; let dot = 0, aa = 0, bb = 0; for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; aa += a[i] ** 2; bb += b[i] ** 2; } return aa && bb ? dot / Math.sqrt(aa * bb) : 0; }
-async function embed(text) { const key = process.env.MORY_EMBEDDING_API_KEY || process.env.MORY_LLM_API_KEY; if (!key) return undefined; const endpoint = (process.env.MORY_EMBEDDING_BASE_URL || process.env.MORY_LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "") + "/embeddings"; const response = await fetch(endpoint, { method: "POST", headers: { authorization: "Bearer " + key, "content-type": "application/json" }, body: JSON.stringify({ model: process.env.MORY_EMBEDDING_MODEL || "text-embedding-3-small", input: text }) }); if (!response.ok) return undefined; return (await response.json()).data?.[0]?.embedding; }
-async function search(query, scope, limit) { const terms = normalize(query).split(" ").filter(Boolean); const vector = await embed(query); return allMemories(scope).map((memory) => { const haystack = normalize(memory.title + " " + memory.text + " " + memory.tags.join(" ") + " " + JSON.stringify(memory.metadata)); const keyword = terms.length ? terms.filter((term) => haystack.includes(term)).length / terms.length : 0; const semantic = cosine(vector, memory.embedding); return { memory, score: Math.min(1, semantic * 0.55 + keyword * 0.45) }; }).filter((item) => !terms.length || item.score > 0).sort((a, b) => b.score - a.score || b.memory.updatedAt.localeCompare(a.memory.updatedAt)).slice(0, limit || 10); }
-function messageText(messages) { return typeof messages === "string" ? messages.trim() : (messages || []).map((message) => (message.role || "user") + ": " + (message.content || "")).join("\n").trim(); }
-function fallbackCandidates(text, kind) { const chunks = text.split(/(?<=[.!?。！？])\s+|\n+/u).map((value) => value.trim()).filter((value) => value.length >= 24); return (chunks.length ? chunks : [text]).slice(0, 8).map((text) => ({ text, kind: kind || "note", confidence: 0.7 })); }
-async function extract(input, related) { const text = messageText(input.messages || input.text || input.content); if (!process.env.MORY_LLM_API_KEY) return { extractor: "local-fallback", candidates: fallbackCandidates(text, input.kind) }; const endpoint = (process.env.MORY_LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "") + "/chat/completions"; const payload = { model: process.env.MORY_LLM_MODEL || "gpt-4o-mini", temperature: 0, response_format: { type: "json_object" }, messages: [{ role: "system", content: "Extract durable memories for future work. Exclude secrets, temporary reasoning, routine output, and filler. Return JSON with memories: [{text, kind, confidence, supersedes?}]." }, { role: "user", content: JSON.stringify({ newInput: text, relatedMemories: related.map((memory) => ({ id: memory.id, text: memory.text })) }) }] }; const response = await fetch(endpoint, { method: "POST", headers: { authorization: "Bearer " + process.env.MORY_LLM_API_KEY, "content-type": "application/json" }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error("LLM extraction failed (" + response.status + ")"); const result = await response.json(); const parsed = JSON.parse(result.choices?.[0]?.message?.content || "{}"); return { extractor: "llm", candidates: Array.isArray(parsed.memories) ? parsed.memories : [] }; }
-function authorized(request) { const supplied = Buffer.from((request.headers.authorization || "").replace(/^Bearer\s+/i, "")); const expected = Buffer.from(token); return supplied.length === expected.length && timingSafeEqual(supplied, expected); }
-function send(response, status, result) { response.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": process.env.MORY_CORS_ORIGIN || "http://127.0.0.1:" + port, "access-control-allow-headers": "authorization, content-type, x-request-id", "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS" }); response.end(JSON.stringify(result)); }
+const port=Number(process.env.MORY_PORT||8787);
+const token=process.env.MORY_API_TOKEN||randomBytes(24).toString("hex");
+const databasePath=resolve(process.env.MORY_DATABASE||"./data/mory.sqlite");
+const webDist=process.env.MORY_WEB_DIST?resolve(process.env.MORY_WEB_DIST):undefined;
+await mkdir(dirname(databasePath),{recursive:true});
+const repository=await openRepository(databasePath);
+const wire=memory=>({...memory,text:memory.payload.content,title:memory.payload.title,hash:memory.contentHash,createdAt:memory.capturedAt});
+const textOf=value=>typeof value==="string"?value.trim():Array.isArray(value)?value.map(m=>`${m.role||"user"}: ${m.content||""}`).join("\n").trim():"";
+async function modelRequest(path,payload,embedding=false) {
+  const key=embedding?process.env.MORY_EMBEDDING_API_KEY||process.env.MORY_LLM_API_KEY:process.env.MORY_LLM_API_KEY;
+  if(!key)return undefined;
+  const base=(embedding?process.env.MORY_EMBEDDING_BASE_URL||process.env.MORY_LLM_BASE_URL:process.env.MORY_LLM_BASE_URL)||"https://api.openai.com/v1";
+  const response=await fetch(base.replace(/\/$/,"")+path,{method:"POST",headers:{authorization:`Bearer ${key}`,"content-type":"application/json"},body:JSON.stringify(payload),signal:AbortSignal.timeout(30_000)});
+  if(!response.ok)throw new RepositoryError(502,`Model request failed (${response.status}).`);
+  return response.json();
+}
+async function embed(text) {
+  const result=await modelRequest("/embeddings",{model:process.env.MORY_EMBEDDING_MODEL||"text-embedding-3-small",input:text},true);
+  return result?.data?.[0]?.embedding;
+}
+function cosine(a,b) {
+  if(!Array.isArray(a)||!Array.isArray(b)||!a.length||a.length!==b.length)return 0;
+  let dot=0,aa=0,bb=0;for(let i=0;i<a.length;i++){dot+=a[i]*b[i];aa+=a[i]**2;bb+=b[i]**2;}
+  return aa&&bb?dot/Math.sqrt(aa*bb):0;
+}
+async function search(query,scope,limit) {
+  if(typeof query!=="string")throw new RepositoryError(400,"Query must be text.");
+  const ranked=repository.search(query,scope,limit);
+  const vector=query?await embed(query).catch(()=>undefined):undefined;
+  if(!vector)return ranked;
+  const scores=new Map(ranked.map((item,i)=>[item.memory.id,{memory:item.memory,score:1/(i+1)}]));
+  for(const memory of repository.list(scope)){const similarity=cosine(vector,memory.embedding);if(similarity>0.2)scores.set(memory.id,{memory,score:(scores.get(memory.id)?.score||0)+similarity});}
+  return [...scores.values()].sort((a,b)=>b.score-a.score).slice(0,limit);
+}
+function authorized(request) {
+  const supplied=Buffer.from((request.headers.authorization||"").replace(/^Bearer\s+/i,"")),expected=Buffer.from(token);
+  return supplied.length===expected.length&&timingSafeEqual(supplied,expected);
+}
+function send(response,status,result) {
+  response.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":process.env.MORY_CORS_ORIGIN||`http://127.0.0.1:${port}`,"access-control-allow-headers":"authorization, content-type, if-match, x-request-id","access-control-allow-methods":"GET, POST, PATCH, DELETE, OPTIONS"});
+  response.end(status===204?undefined:JSON.stringify(result));
+}
+async function requestBody(request) {
+  const maxBytes=16*1024*1024;let size=0;const chunks=[];
+  if(Number(request.headers["content-length"]||0)>maxBytes)throw new RepositoryError(413,"Request exceeds 16 MiB limit.");
+  for await(const chunk of request){size+=chunk.length;if(size>maxBytes)throw new RepositoryError(413,"Request exceeds 16 MiB limit.");chunks.push(chunk);}
+  let input;try{input=size?JSON.parse(Buffer.concat(chunks).toString("utf8")):{};}catch{throw new RepositoryError(400,"Invalid JSON.");}
+  if(!input||typeof input!=="object"||Array.isArray(input))throw new RepositoryError(400,"Expected a JSON object.");
+  return input;
+}
+const server=createServer(async(request,response)=>{
+  try {
+    if(request.method==="OPTIONS")return send(response,204);
+    const url=new URL(request.url,"http://localhost");
+    if(url.pathname==="/health")return send(response,200,{ok:true,service:"mory-api",storage:"sqlite",schemaVersion:2,search:"fts5-bm25+optional-vector"});
+    if(url.pathname==="/runtime-config")return send(response,200,{apiUrl:`http://127.0.0.1:${port}`,token});
+    if(request.method==="GET"&&!url.pathname.startsWith("/v1/")&&await sendWeb(response,url.pathname))return;
+    if(!authorized(request))throw new RepositoryError(401,"Invalid token.");
+    if(request.method==="GET"&&url.pathname==="/v1/memories"){
+      const scope=Object.fromEntries(["userId","projectId"].filter(key=>url.searchParams.has(key)).map(key=>[key,url.searchParams.get(key)]));
+      const limit=Number(url.searchParams.get("limit")||50),offset=Number(url.searchParams.get("offset")||0);
+      if(!Number.isSafeInteger(limit)||limit<1||limit>200||!Number.isSafeInteger(offset)||offset<0)throw new RepositoryError(400,"Invalid pagination.");
+      const all=repository.list(scope);return send(response,200,{memories:all.slice(offset,offset+limit).map(wire),total:all.length,offset,nextOffset:offset+limit<all.length?offset+limit:null});
+    }
+    if(request.method==="GET"&&url.pathname==="/v1/snapshot")return send(response,200,repository.snapshot());
+    if(request.method==="POST"&&url.pathname==="/v1/sync")return send(response,200,await repository.reconcile(await requestBody(request)));
+    if(request.method==="POST"&&(url.pathname==="/v1/memories/search"||url.pathname==="/v1/context")){
+      const input=await requestBody(request);const results=await search(input.query??"",input.scope??{},input.limit??(url.pathname==="/v1/context"?12:10));
+      const memories=results.map(item=>wire(item.memory));
+      return send(response,200,url.pathname==="/v1/context"?{query:input.query||"",memories,context:memories.map(m=>`- ${m.text}`).join("\n")}:{results:results.map(item=>({...item,memory:wire(item.memory)}))});
+    }
+    if(request.method==="POST"&&url.pathname==="/v1/memories/remember"){
+      const input=await requestBody(request),text=textOf(input.messages||input.text||input.content);
+      if(!text)throw new RepositoryError(400,"Messages or text is required.");
+      const related=repository.search(text,input.scope||{},10).map(item=>({id:item.memory.id,text:item.memory.payload.content}));
+      const extraction=await modelRequest("/chat/completions",{model:process.env.MORY_LLM_MODEL||"gpt-4o-mini",temperature:0,response_format:{type:"json_object"},messages:[{role:"system",content:"Extract durable memories. Exclude secrets, temporary reasoning and filler. Return JSON {memories:[{text,kind}]}. Existing memories are read-only context; do not supersede them."},{role:"user",content:JSON.stringify({newInput:text,relatedMemories:related})}]});
+      const candidates=extraction?JSON.parse(extraction.choices?.[0]?.message?.content||"{}").memories:text.split(/(?<=[.!?。！？])\s+|\n+/u).map(s=>s.trim()).filter(Boolean).slice(0,8).map(text=>({text,kind:input.kind||"note"}));
+      if(!Array.isArray(candidates)||candidates.length>100)throw new RepositoryError(502,"Invalid extraction result.");
+      const event={id:randomUUID(),text,source:input.source||"agent",actor:input.actor||{type:"agent",id:"api"},scope:input.scope||{},createdAt:new Date().toISOString()};
+      const prepared=await Promise.all(candidates.map(async candidate=>({...candidate,source:event.source,actor:event.actor,scope:event.scope,isPrivate:input.isPrivate??false,metadata:{...(input.metadata||{}),...(candidate.metadata||{})},sourceEventIds:[event.id],embedding:await embed(candidate.text).catch(()=>undefined)})));
+      const result=await repository.remember(event,prepared);
+      return send(response,201,{eventId:event.id,extractor:extraction?"llm":"local-fallback",addedCount:result.memories.length,memories:result.memories.map(wire),duplicates:result.duplicates.map(wire)});
+    }
+    if(request.method==="POST"&&url.pathname==="/v1/memories"){
+      const input=await requestBody(request);
+      input.embedding=await embed(input.payload?.content??input.text??input.content??"").catch(()=>undefined);
+      const result=await repository.create(input);return send(response,result.duplicate?200:201,{...result,memory:wire(result.memory)});
+    }
+    const history=url.pathname.match(/^\/v1\/memories\/([^/]+)\/history$/);
+    if(history&&request.method==="GET")return send(response,200,{versions:repository.history(decodeURIComponent(history[1]))});
+    const match=url.pathname.match(/^\/v1\/memories\/([^/]+)$/);
+    if(match){
+      const id=decodeURIComponent(match[1]),memory=repository.get(id);
+      if(!memory)throw new RepositoryError(404,"Memory not found.");
+      if(request.method==="GET")return send(response,200,{memory:wire(memory)});
+      if(request.method==="PATCH"||request.method==="DELETE"){
+        const input=await requestBody(request);
+        const expected=input.expectedRevision??input.revision??(request.headers["if-match"]?Number(request.headers["if-match"].replaceAll('"','')):undefined);
+        const nextText=input.text??input.content??input.payload?.content??memory.payload.content;
+        if(request.method==="PATCH"&&nextText!==memory.payload.content)input.embedding=(await embed(nextText).catch(()=>undefined))??null;
+        // Legacy clients can omit a revision; the repository still checks for changes during the request.
+        const next=await repository.update(id,request.method==="DELETE"?{status:"deleted"}:input,expected);
+        return send(response,200,{ok:true,memory:wire(next)});
+      }
+    }
+    if(request.method==="POST"&&url.pathname==="/v1/clear"){
+      const snapshot=repository.snapshot();return send(response,200,await repository.reconcile({memories:[],tombstones:[...snapshot.tombstones,...snapshot.memories.map(m=>m.id)],expectedGeneration:snapshot.generation}));
+    }
+    if(request.method==="GET"&&url.pathname==="/v1/export")return send(response,200,repository.archive());
+    if(request.method==="POST"&&url.pathname==="/v1/import")return send(response,201,await repository.restore(await requestBody(request)));
+    if(request.method==="POST"&&url.pathname==="/v1/backup/github")return send(response,200,await backupGithub(repository,await requestBody(request)));
+    throw new RepositoryError(404,"Not found.");
+  }catch(error){send(response,error.status||400,{error:error.message||"Bad request."});}
+});
+server.requestTimeout=30_000;server.headersTimeout=10_000;
+server.listen(port,"127.0.0.1",()=>console.log(`Mory API listening on http://127.0.0.1:${port} (${databasePath})`));
+for(const signal of ["SIGINT","SIGTERM"])process.once(signal,()=>server.close(()=>{repository.close();process.exit(0);}));
 async function sendWeb(response, pathname) {
   if (!webDist) return false;
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const safePath = resolve(webDist, relative);
-  if (!safePath.startsWith(webDist)) return false;
+  if (safePath !== webDist && !safePath.startsWith(webDist + sep)) return false;
   try {
     const body = await readFile(safePath);
     const type = safePath.endsWith(".html") ? "text/html; charset=utf-8" : safePath.endsWith(".js") ? "text/javascript; charset=utf-8" : safePath.endsWith(".css") ? "text/css; charset=utf-8" : safePath.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
@@ -52,36 +138,3 @@ async function sendWeb(response, pathname) {
     return false;
   }
 }
-async function requestBody(request) { const maxBytes = 2 * 1024 * 1024; if (Number(request.headers["content-length"] || 0) > maxBytes) throw new Error("request body exceeds 2 MiB limit"); let raw = ""; let size = 0; for await (const chunk of request) { size += chunk.length; if (size > maxBytes) throw new Error("request body exceeds 2 MiB limit"); raw += chunk; } return raw ? JSON.parse(raw) : {}; }
-async function backupGithub(input) {
-  if (!input.token || !input.owner || !input.repo) throw new Error("GitHub backup needs token, owner and repo.");
-  const base = "https://api.github.com/repos/" + encodeURIComponent(input.owner) + "/" + encodeURIComponent(input.repo) + "/contents";
-  const headers = { Accept: "application/vnd.github+json", Authorization: "Bearer " + input.token, "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" };
-  const branch = input.branch || "main";
-  async function current(path) { const response = await fetch(base + "/" + path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch), { headers }); return response.ok ? (await response.json()).sha : undefined; }
-  async function put(path, content, message) { const sha = await current(path); const response = await fetch(base + "/" + path.split("/").map(encodeURIComponent).join("/"), { method: "PUT", headers, body: JSON.stringify({ message, content, branch, ...(sha ? { sha } : {}) }) }); if (!response.ok) throw new Error("GitHub backup failed (" + response.status + ")"); }
-  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-  const sqlite = await readFile(databasePath);
-  const jsonSnapshot = JSON.stringify({ schemaVersion: 3, exportedAt: new Date().toISOString(), memories: allMemories({}) }, null, 2);
-  const sqlitePath = input.sqlitePath || "mory/mory.sqlite";
-  const jsonPath = input.jsonPath || "mory/memories.json";
-  await put(sqlitePath, sqlite.toString("base64"), "backup: update Mory SQLite repository");
-  await put(jsonPath, Buffer.from(jsonSnapshot).toString("base64"), "backup: update Mory JSON snapshot");
-  return { sqlitePath, jsonPath, count: allMemories({}).length };
-}
-const server = createServer(async (request, response) => { if (request.method === "OPTIONS") return send(response, 204, {}); const url = new URL(request.url, "http://localhost"); if (url.pathname === "/health") return send(response, 200, { ok: true, service: "mory-api", storage: "sqlite", schemaVersion, search: "bm25+optional-vector" }); if (url.pathname === "/runtime-config") return send(response, 200, { apiUrl: `http://127.0.0.1:${port}`, token }); if (request.method === "GET" && !url.pathname.startsWith("/v1/") && await sendWeb(response, url.pathname)) return; if (!authorized(request)) return send(response, 401, { error: "invalid token" }); try {
-  if (request.method === "GET" && url.pathname === "/v1/memories") { const memories = allMemories({ userId: url.searchParams.get("userId"), projectId: url.searchParams.get("projectId") }); const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") || 50))); return send(response, 200, { memories: memories.slice(0, limit), total: memories.length }); }
-  if (request.method === "POST" && url.pathname === "/v1/memories/search") { const input = await requestBody(request); return send(response, 200, { results: await search(input.query || "", input.scope || {}, Number(input.limit || 10)) }); }
-  if (request.method === "POST" && url.pathname === "/v1/context") { const input = await requestBody(request); const results = await search(input.query || "", input.scope || {}, Number(input.limit || 12)); const memories = results.map((item) => item.memory); return send(response, 200, { query: input.query || "", memories, context: memories.map((memory) => `- ${memory.text}`).join("\n") }); }
-  if (request.method === "POST" && url.pathname === "/v1/memories/remember") { const input = await requestBody(request); const text = messageText(input.messages || input.text || input.content); if (!text) return send(response, 400, { error: "messages or text is required" }); const rawId = randomUUID(); const scope = input.scope || {}; db.prepare("INSERT INTO raw_events(id,content,source,actor_json,scope_json,created_at) VALUES (?,?,?,?,?,?)").run(rawId, text, input.source || "agent", JSON.stringify(actor(input.actor)), JSON.stringify(scope), new Date().toISOString()); const extracted = await extract(input, (await search(text, scope, 10)).map((item) => item.memory)); const added = [], duplicates = []; for (const candidate of extracted.candidates) { const memory = makeMemory({ ...candidate, source: input.source || "agent", actor: actor(input.actor), scope, metadata: { ...(input.metadata || {}), ...(candidate.metadata || {}) }, sourceEventIds: [rawId], embedding: await embed(candidate.text) }, "agent"); const duplicate = allMemories(scope).find((item) => item.hash === memory.hash); if (duplicate) { duplicates.push(duplicate); continue; } insert(memory); addEvent("ADD", memory, { sourceEventId: rawId }); linkEntities(memory); if (candidate.supersedes) { db.prepare("INSERT INTO relations(id,from_memory_id,to_memory_id,type,created_at) VALUES (?,?,?,?,?)").run(randomUUID(), memory.id, candidate.supersedes, "supersedes", memory.createdAt); db.prepare("UPDATE memories SET status = 'superseded', updated_at = ? WHERE id = ?").run(memory.updatedAt, candidate.supersedes); } added.push(memory); } return send(response, 201, { eventId: rawId, extractor: extracted.extractor, memories: added, duplicates, addedCount: added.length }); }
-  if (request.method === "POST" && url.pathname === "/v1/memories") { const memory = makeMemory(await requestBody(request)); const duplicate = allMemories(memory.scope).find((item) => item.hash === memory.hash); if (duplicate) return send(response, 200, { memory: duplicate, duplicate: true }); const sameId = getMemory(memory.id); if (sameId && sameId.status !== "deleted") return send(response, 200, { memory: sameId, duplicate: true }); if (sameId?.status === "deleted") { db.prepare("DELETE FROM memories WHERE id = ?").run(memory.id); } insert(memory); addEvent("ADD", memory); linkEntities(memory); return send(response, 201, { memory, duplicate: false }); }
-  const match = url.pathname.match(/^\/v1\/memories\/([^/]+)$/);
-  if (match && request.method === "GET") { const memory = getMemory(match[1]); return memory ? send(response, 200, { memory }) : send(response, 404, { error: "memory not found" }); }
-  if (match && request.method === "PATCH") { const current = getMemory(match[1]); if (!current) return send(response, 404, { error: "memory not found" }); const input = await requestBody(request); const nextText = String(input.text || input.content || input.payload?.content || current.text).trim(); const contentChanged = nextText !== current.text || String(input.title || current.title) !== current.title; const next = makeMemory({ ...current, ...input, id: current.id, text: nextText, hash: undefined, contentHash: undefined, embedding: contentChanged ? await embed(nextText) : current.embedding, sourceEventIds: [...current.sourceEventIds, randomUUID()] }, current.source); db.exec("BEGIN"); try { db.prepare("DELETE FROM memory_fts WHERE memory_id = ?").run(current.id); db.prepare("DELETE FROM memories WHERE id = ?").run(current.id); insert(next); addEvent("UPDATE", next, { oldHash: current.hash, newHash: next.hash }); db.exec("COMMIT"); } catch (error) { db.exec("ROLLBACK"); throw error; } return send(response, 200, { memory: next }); }
-  if (match && request.method === "DELETE") { const memory = getMemory(match[1]); if (!memory) return send(response, 404, { error: "memory not found" }); db.prepare("UPDATE memories SET status = 'deleted', updated_at = ? WHERE id = ?").run(new Date().toISOString(), memory.id); db.prepare("DELETE FROM memory_fts WHERE memory_id = ?").run(memory.id); addEvent("DELETE", memory); return send(response, 200, { ok: true }); }
-  if (request.method === "GET" && url.pathname === "/v1/export") return send(response, 200, { schemaVersion: 1, exportedAt: new Date().toISOString(), memories: allMemories({}) });
-  if (request.method === "POST" && url.pathname === "/v1/import") { const input = await requestBody(request); if (!Array.isArray(input.memories)) return send(response, 400, { error: "memories array is required" }); const added = [], duplicates = []; for (const item of input.memories.slice(0, 10000)) { const memory = makeMemory(item); const duplicate = allMemories(memory.scope).find((candidate) => candidate.hash === memory.hash); if (duplicate) { duplicates.push(duplicate.id); continue; } const existing = getMemory(memory.id); if (existing && existing.status !== "deleted") { duplicates.push(memory.id); continue; } if (existing?.status === "deleted") db.prepare("DELETE FROM memories WHERE id = ?").run(memory.id); insert(memory); addEvent("IMPORT", memory); linkEntities(memory); added.push(memory); } return send(response, 201, { addedCount: added.length, duplicateCount: duplicates.length, memories: added }); }
-  if (request.method === "POST" && url.pathname === "/v1/backup/github") return send(response, 200, await backupGithub(await requestBody(request)));
-  return send(response, 404, { error: "not found" });
-} catch (error) { return send(response, 400, { error: error instanceof Error ? error.message : "bad request" }); } });
-server.listen(port, "127.0.0.1", () => console.log("Mory API listening on http://127.0.0.1:" + port + " (" + databasePath + ")"));

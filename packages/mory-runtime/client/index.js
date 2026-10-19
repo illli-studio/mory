@@ -7,7 +7,7 @@ export class MoryClient {
     remember(input) { return this.request("/v1/memories/remember", { method: "POST", body: JSON.stringify({ ...input, source: input.source ?? "sdk", actor: { type: "agent", id: "sdk" }, scope: input.projectId ? { projectId: input.projectId } : {} }) }); }
     search(query, options = {}) { return this.request("/v1/memories/search", { method: "POST", body: JSON.stringify({ query, limit: options.limit ?? 10, scope: options.projectId ? { projectId: options.projectId } : {} }) }); }
     context(query, options = {}) { return this.request("/v1/context", { method: "POST", body: JSON.stringify({ query, limit: options.limit ?? 12, scope: options.projectId ? { projectId: options.projectId } : {} }) }); }
-    list(options = {}) { const params = new URLSearchParams({ limit: String(options.limit ?? 50) }); if (options.projectId)
+    list(options = {}) { const params = new URLSearchParams({ limit: String(options.limit ?? 50), offset: String(options.offset ?? 0) }); if (options.projectId)
         params.set("projectId", options.projectId); return this.request(`/v1/memories?${params}`, { method: "GET" }); }
     export() { return this.request("/v1/export", { method: "GET" }); }
     import(memories) { return this.request("/v1/import", { method: "POST", body: JSON.stringify({ memories }) }); }

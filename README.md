@@ -1,21 +1,29 @@
-<div align="center">
-
-# Mory
-
-### Your Personal Memory Operating System.
-
-*A local-first memory engine that helps AI truly understand you.*
-
-<p>
-
-<img src="https://img.shields.io/badge/Local--First-✓-2ea44f" />
-<img src="https://img.shields.io/badge/Open%20Source-AGPLv3-blue" />
-<img src="https://img.shields.io/badge/AI%20Native-Memory-purple" />
-<img src="https://img.shields.io/badge/Status-Early%20Development-orange" />
-
+<p align="center">
+  <a href="https://mory.cloud/"><img src="docs/branding/readme-header.svg" alt="Mory — Your Personal Memory Operating System" width="760"></a>
 </p>
 
-</div>
+<h3 align="center">Let AI finally remember.</h3>
+
+<p align="center">
+  Your projects. Your ideas. Your story.<br>
+  A personal memory that stays with you, wherever you use AI.
+</p>
+
+<p align="center">
+  <a href="https://mory.cloud/"><img src="https://img.shields.io/badge/Website-mory.cloud-0B3B32?style=flat-square&amp;logo=googlechrome&amp;logoColor=white" alt="Website: mory.cloud"></a>
+  <a href="#get-started"><img src="https://img.shields.io/badge/Get_started-0B3B32?style=flat-square" alt="Get started"></a>
+  <a href="docs/GETTING_STARTED.md"><img src="https://img.shields.io/badge/Docs-2C6870?style=flat-square" alt="Documentation"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPLv3-64856B?style=flat-square" alt="License: AGPLv3"></a>
+  <a href="#where-we-are"><img src="https://img.shields.io/badge/Early_development-C58A45?style=flat-square" alt="Status: Early development"></a>
+</p>
+
+<p align="center">
+  <a href="#why-mory">Why Mory?</a> ·
+  <a href="#vision">Vision</a> ·
+  <a href="#philosophy">Philosophy</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#roadmap">Roadmap</a>
+</p>
 
 ---
 
@@ -41,7 +49,7 @@ The missing piece isn't a better model.
 
 It's **memory**.
 
-Mory is building a **Personal Memory Operating System** — a local-first memory engine that continuously learns from your digital life and provides long-term context for any AI.
+Mory is building a **Personal Memory Operating System** — a place for the things you want AI to remember, kept on your own device and available across your tools.
 
 Instead of asking AI to remember you,
 
@@ -49,7 +57,7 @@ Mory gives you ownership of your own memory.
 
 ---
 
-# Vision
+## Vision
 
 Imagine asking:
 
@@ -69,88 +77,52 @@ That's the future Mory is building.
 
 ---
 
-# Philosophy
+## Philosophy
 
 Mory is designed around four core principles.
 
-## 🏠 Local First
+### 🏠 Your memory belongs to you
 
 Your memory belongs to you.
 
-Everything is stored locally before anything touches the cloud.
+Keep your memories on your own device. Take them with you when you change tools.
 
 No mandatory accounts.
 
 No vendor lock-in.
 
-Cloud exists only for synchronization.
+Use the cloud when you want to sync or back up.
 
 ---
 
-## 📜 Memory is Immutable
+### 📜 Keep the original story
 
 AI should never rewrite history.
 
-Original memories never change.
-
-AI only creates:
-
-- summaries
-- embeddings
-- relationships
-- tags
-- knowledge
-
-Your raw memories remain untouched forever.
+Mory is designed to keep original memories separate from what AI learns from them.
+Summaries and connections should help you understand the past, with a way back to
+where they came from.
 
 ---
 
-## 🌱 AI Learns You
+### 🌱 Let understanding grow
 
 Mory isn't another note-taking app.
 
-It continuously learns:
+The goal is for AI to learn:
 
 - how you write
 - how you think
 - what you're building
 - what you're interested in
 
-The longer you use it,
-
-the smarter your AI becomes.
+So you spend less time explaining yourself again.
 
 ---
 
-## 🔄 Git-inspired Architecture
+### 🔄 Carry your memory forward
 
-Mory treats memory like source code.
-
-Every device owns a complete memory repository.
-
-```
-Capture
-
-↓
-
-Memory Objects
-
-↓
-
-Memory Commit
-
-↓
-
-Snapshot
-
-↓
-
-Push / Pull
-
-↓
-
-Sync
-```
+Every device should be able to hold your story.
 
 History should be traceable.
 
@@ -160,9 +132,9 @@ Ownership should always remain local.
 
 ---
 
-# Connectors
+## Memory wherever you work
 
-Everything that produces context can become a connector.
+The vision is to bring useful context from the places you already work:
 
 - ⌨ Keyboard
 - 📋 Clipboard
@@ -175,114 +147,89 @@ Everything that produces context can become a connector.
 - 📂 Files
 - 💬 Chat Applications
 
-More connectors will continue to arrive.
+Broader app connections are on the roadmap. GitHub and Gitee sync are available today.
 
 ---
 
-# Memory Pipeline
+## From moments to memory
 
 ```
-Capture
-
-↓
-
-Filter
-
-↓
-
-Understand
-
-↓
-
-Embedding
-
-↓
-
-Knowledge Graph
-
-↓
-
-Memory Repository
-
-↓
-
-AI Context
+Save what matters → Find the connections → Pick up where you left off
 ```
 
 Instead of saving everything forever,
 
-Mory continuously organizes your memory into knowledge.
+Mory aims to turn useful moments into lasting understanding.
 
 ---
 
-# Long-Term Memory
+## Long-term memory
 
 Mory doesn't simply record events.
 
-It builds understanding.
+The goal is to build understanding.
 
-From thousands of tiny interactions,
-
-AI gradually constructs:
+From thousands of tiny interactions, AI should gradually understand:
 
 - your projects
 - your interests
 - your writing style
 - your decision history
-- your knowledge graph
+- how your ideas connect
 
 Your second brain grows naturally over time.
 
 ---
 
-# Roadmap
+## Roadmap
+
+These are directions, not release dates; some pieces are already available.
 
 ### Phase 1
 
-- Local Memory Repository
-- Clipboard Connector
-- Browser Connector
-- Timeline
-- Semantic Search
+- A home for your memories
+- Save useful moments from your clipboard and browser
+- Browse your history and find things again
 
 ### Phase 2
 
-- Memory Engine
-- AI Daily Summary
-- Knowledge Graph
-- Embedding Pipeline
+- Daily summaries
+- Connections between related ideas
+- A growing understanding of your projects
 
 ### Phase 3
 
-- Multi-device Sync
-- Git-like Memory Repository
-- Memory Commit
-- Snapshot
+- Your memory across devices
+- A complete copy you can keep
+- Recoverable history
 
 ### Phase 4
 
-- Android Keyboard
-- iOS Keyboard
-- VS Code Extension
-- Open Connector SDK
+- Phone keyboards
+- Your code editor
+- More ways to connect your everyday tools
 
 ---
 
-# Tech Stack
+## Where we are
 
-> Still evolving.
+Mory is in **early development**. The vision above guides what we're building;
+some of it is still ahead of us.
 
-- Rust
-- Tauri
-- SQLite
-- PostgreSQL
-- pgvector
-- FastAPI
-- OpenAI Compatible APIs
+Today, you can:
 
-## Agent memory service
+- **Keep memories in one place** with a local service and a web interface.
+- **Find things again** by searching saved memories.
+- **Give AI a memory** by connecting a compatible assistant.
+- **Take your memories with you** through export and import.
+- **Sync or back up with GitHub**, with Gitee sync also available in the web app.
 
-Mory can run as a single local service that serves both the web console and the API:
+Automatic capture from your everyday apps and a richer understanding of your
+projects are still on the roadmap.
+
+## Get started
+
+Install [Node.js 22.18 or newer](https://nodejs.org/), then run:
 
 ```bash
 npm install -g @illli-studio/mory
@@ -290,23 +237,14 @@ mory init
 mory start
 ```
 
-To keep the service running while returning to your shell:
+Open the local address printed in your terminal to explore your memories.
+Your data stays in `~/.mory` (or the equivalent folder on your system).
 
-```bash
-mory start --background
-mory status
-```
+<details>
+<summary><strong>Connect your AI assistant</strong></summary>
 
-Data can be moved between machines without touching the SQLite file directly:
-
-```bash
-mory export ./mory-export.json
-mory import ./mory-export.json
-```
-
-The default data directory is `~/.mory` (or the platform equivalent). The website and all local agents use the same SQLite repository. The API stores append-oriented memory records, hash-deduplicates exact repeats, keeps event history, supports BM25/entity search, and uses tombstone deletes.
-
-Mory also exposes a generic MCP server over stdio. Add this to an MCP-compatible agent:
+Add Mory to an assistant that supports MCP, the connection that lets AI tools
+use your memories:
 
 ```json
 {
@@ -319,36 +257,17 @@ Mory also exposes a generic MCP server over stdio. Add this to an MCP-compatible
 }
 ```
 
-Available tools are `mory_remember`, `mory_search`, `mory_context`, `mory_get`, `mory_list`, `mory_update`, and `mory_forget`. TypeScript integrations can use `@illli-studio/mory/client`.
+Keep the local Mory service running while your assistant uses it.
 
-The GitHub Sync panel can commit both `mory/mory.sqlite` and a readable `mory/memories.json` snapshot. GitHub is a versioned backup target; the running SQLite file remains the source of truth.
+</details>
 
-## Deploy the web app to Cloudflare Pages
-
-The web app can also run as a static GitHub-backed memory viewer/editor. This
-mode does not require `mory start`, Node.js, or a Cloudflare database: the
-browser keeps a local IndexedDB cache and GitHub stores the durable
-`mory/memories.json` snapshot.
-
-Use these Cloudflare Pages settings:
-
-```text
-Build command: pnpm build
-Build output directory: apps/web/dist
-```
-
-After deployment, open the Memory Sync settings, enter a fine-grained GitHub
-token with Contents read/write access to the selected repository, and choose
-the repository containing the memory file. The token is kept in that browser's
-local storage; it is not part of the deployed site. Never commit a token to
-the repository or expose it in build-time environment variables.
-
-The local npm package remains the full local-first mode with SQLite, CLI, and
-MCP. Cloudflare Pages is the lightweight web-only mode.
+For background operation, moving data, web deployment, or contributing code,
+see the [setup guide](docs/GETTING_STARTED.md).
+Developers can also read the [API guide](docs/API.md).
 
 ---
 
-# Our Belief
+## Our belief
 
 AI models will become commodities.
 

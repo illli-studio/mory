@@ -18,7 +18,8 @@ export type MemorySource =
   | "browser"
   | "file"
   | "chat"
-  | "github";
+  | "github"
+  | (string & {});
 
 export interface MemoryOrigin {
   deviceId: string;
@@ -51,6 +52,12 @@ export interface MemoryObject {
   schemaVersion: number;
   actor?: { type: "human" | "agent" | "ai" | "plugin"; id?: string };
   origin?: MemoryOrigin;
+  scope?: Record<string, string>;
+  metadata?: Record<string, unknown>;
+  status?: "active" | "deleted" | "superseded";
+  revision?: number;
+  sourceEventIds?: string[];
+  embedding?: number[];
 }
 
 export interface CreateMemoryInput {
@@ -145,15 +152,13 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryObje
   const content = input.content.trim();
   const detectedUrl = input.url?.trim() || extractUrls(`${title} ${content}`)[0];
   const fields = cleanFields(input.fields ?? {});
-  const contentHash = await sha256(JSON.stringify({ source, kind, title, content, url: detectedUrl ?? "", fields }));
 
-  return {
+  return normalizeMemory({
     id: crypto.randomUUID(),
     type,
     source,
     capturedAt,
     updatedAt: capturedAt,
-    contentHash,
     payload: {
       title,
       content,
@@ -167,8 +172,8 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryObje
     score: Math.min(100, Math.max(1, Math.round(content.length / 12) + 20)),
     preview: createPreview(content),
     isPrivate: input.isPrivate ?? false,
-    schemaVersion: 1,
-  };
+    schemaVersion: 2,
+  });
 }
 
 export function matchesMemory(memory: MemoryObject, query: string): boolean {
@@ -212,13 +217,13 @@ function cleanFields(fields: MemoryFields): MemoryFields {
 }
 
 export function computeStats(memories: MemoryObject[], now = new Date()): MemoryStats {
-  const todayKey = now.toISOString().slice(0, 10);
+  const todayKey = now.toDateString();
   const sources = emptySourceCounts();
   const types = emptyTypeCounts();
   const tagCounts = new Map<string, number>();
 
   for (const memory of memories) {
-    sources[memory.source] += 1;
+    sources[memory.source] = (sources[memory.source] ?? 0) + 1;
     types[memory.type] += 1;
     for (const tag of memory.tags) {
       tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
@@ -229,7 +234,7 @@ export function computeStats(memories: MemoryObject[], now = new Date()): Memory
     total: memories.length,
     sources,
     types,
-    today: memories.filter((memory) => memory.capturedAt.slice(0, 10) === todayKey).length,
+    today: memories.filter((memory) => new Date(memory.capturedAt).toDateString() === todayKey).length,
     tags: Array.from(tagCounts.entries())
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, 10)
@@ -256,3 +261,6 @@ function emptyTypeCounts(): Record<MemoryType, number> {
     relation: 0,
   };
 }
+
+import { normalizeMemory } from "../protocol.mjs";
+export { normalizeMemory, memoryFingerprint, mergeSnapshots } from "../protocol.mjs";

@@ -98,7 +98,7 @@ async function importMemories(inputPath) {
   if (!await waitForHealth(`http://127.0.0.1:${current.port}`, current.token, 500)) throw new Error("Mory is not running. Start it before importing.");
   const source = resolve(inputPath || join(dataDir, "mory-export.json"));
   const parsed = JSON.parse(readFileSync(source, "utf8"));
-  const result = await apiRequest("/v1/import", current, { method: "POST", body: JSON.stringify({ memories: parsed.memories || parsed }) });
+  const result = await apiRequest("/v1/import", current, { method: "POST", body: JSON.stringify(Array.isArray(parsed) ? { memories: parsed } : parsed) });
   console.log(`Imported ${result.addedCount} memories; skipped ${result.duplicateCount} duplicates.`);
 }
 

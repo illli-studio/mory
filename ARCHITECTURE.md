@@ -1,93 +1,62 @@
 # Mory Architecture
 
-Mory is not just a React app. It should become a local-first memory repository with clear boundaries between capture, storage, organization, sync, and user experience.
+## Current implementation
 
-## Product Layers
+- `apps/web`: React/Vite console with an IndexedDB repository for static hosting.
+- `apps/api/server.mjs`: HTTP transport, optional model requests and static web serving.
+- `apps/api/repository.mjs`: SQLite migration, transactions, immutable versions,
+  tombstones, FTS5 BM25, multilingual entity derivation, archive export/restore.
+- `apps/api/github-backup.mjs`: consistent SQLite snapshot and atomic GitHub backup.
+- `packages/memory-core/protocol.mjs`: shared validation, legacy conversion,
+  deterministic content hashes and conflict-preserving snapshot merging.
+- `packages/memory-core/src`: creation helpers, filtering and local-calendar statistics.
+- `packages/memory-client`: TypeScript API client.
+- `packages/mory-runtime`: CLI, packaged web/API service and MCP stdio adapter.
 
-```text
-Apps
-  web                 PWA memory console
-  desktop-agent       clipboard, files, OS events, background capture
-  browser-extension   pages, highlights, tabs, bookmark imports
+## Storage and migration
 
-Packages
-  memory-core         immutable MemoryObject, hashes, snapshots, commits
-  memory-repository   IndexedDB, OPFS, append-only log, import/export
-  memory-indexer      cleanup, tags, previews, search indexes, retrieval
-  sync-github         GitHub content/tree sync
-  sync-webdav         WebDAV sync
-  connectors          connector contracts and shared capture pipeline
-  security            encryption, redaction, permission policy
-  ui                  product UI primitives and design system
-```
+With the runtime available, the web console and agents use the same SQLite
+repository. Static deployments use IndexedDB. A failed API write is reported;
+it does not silently switch to a different repository.
 
-## Runtime Shape
+Schema 2 retains the original SQLite tables and adds a canonical JSON document,
+revision counters, complete version records, a search index and repository identity.
+Migration captures the surviving original before subsequent edits. History that
+was already overwritten by an earlier runtime cannot be recovered.
 
-```text
-Connector Event
-  -> Capture Pipeline
-  -> Raw MemoryObject
-  -> Local Memory Repository
-  -> Local Index Derivations
-  -> Search / Recall / Selection Packs
-  -> Optional GitHub or WebDAV Sync
-```
+IndexedDB version 2 adds transaction metadata, deletion intent and version history.
+Legacy records receive canonical hashes before mutation. Transfer from IndexedDB
+to a particular API repository is recorded once by repositoryId. It merges
+existing records and tombstones rather than reimporting whenever SQLite is empty.
 
-## Core Principles
+## Synchronization
 
-- Local-first: raw memory enters local storage before any cloud action.
-- Append-only: derived metadata never overwrites raw history.
-- Content-addressed: duplicate content is detected by stable hashes.
-- Connector-neutral: clipboard, browser, files, chat and GitHub share one capture contract.
-- Sync-optional: GitHub/WebDAV are user-owned transport layers, not the product database.
+1. Read a complete local snapshot and its generation.
+2. Read the remote snapshot together with its file SHA.
+3. Merge additions and tombstones. Keep divergent same-id content in a stable
+   conflict copy; do not silently discard either version.
+4. Upload with the SHA from that same read. A 409 causes a new read and a new merge.
+5. Apply the result locally in one transaction. If another local writer changed
+   the generation during the network request, fail without overwriting that edit.
 
-## Storage Plan
+Pull only performs steps 1–3 and 5. Push also merges existing remote contents.
+A normal load only uploads when the user has enabled automatic synchronization.
+Tombstones are retained after successful sync. No sync path calls clear first.
 
-The API repository now uses SQLite as its shared source of truth. The browser can still use Dexie when no API token is configured. The complete repository should split storage responsibilities:
+## Backup and recovery
 
-- SQLite: memories, raw events, history, FTS5 index, entities, relations, and embeddings.
-- IndexedDB: optional offline/browser-only MemoryObject metadata and sync cursors.
-- OPFS: large raw files, attachments, imported PDFs, chunk payloads.
-- Content hash: deduplication and immutable object identity.
-- Tombstones: deletion intent without rewriting historical commits.
-- Snapshots: daily or project-level previews generated as derived objects.
+The JSON archive preserves full versions, original inputs, relations and tombstones.
+SQLite backups use the online backup API; the readable archive is generated from
+the resulting database. Both files enter one GitHub commit, with a non-force branch
+update. Complete SQLite backups require a private repository.
 
-## Sync Plan
+## Verification and remaining boundaries
 
-GitHub backup writes both the SQLite database and a readable JSON snapshot. SQLite is the runtime source of truth; GitHub is a versioned backup target.
+`pnpm test` runs HTTP/MCP, SQLite, IndexedDB, mocked GitHub concurrency and
+backup/restore regressions. `pnpm typecheck` checks TypeScript and parses API modules.
+`pnpm build` compiles the shared packages and website. The runtime prepack copies
+all API modules and the shared protocol so the published CLI has no workspace dependency.
 
-The mature sync package should use chunked objects:
-
-```text
-mory/
-  manifest.json
-  objects/
-    ab/cd/<hash>.json
-  attachments/
-    <hash>.bin
-  snapshots/
-    2026-08-12.json
-  commits/
-    <commit-id>.json
-```
-
-This keeps large repositories incremental and close to the Git-like model.
-
-## MVP Boundaries
-
-Already present:
-
-- `apps/web`
-- `packages/memory-core`
-- IndexedDB persistence
-- manual capture
-- search and filters
-- basic GitHub JSON sync
-
-Next structural milestones:
-
-- Extract `memory-repository` from `apps/web/src/db.ts`.
-- Move GitHub sync into `packages/sync-github`.
-- Add `packages/connectors` and implement clipboard capture.
-- Add `packages/memory-indexer` for previews, tags, search indexes, and recall views.
-- Add OPFS-backed attachment storage.
+Connectors for OS capture, OPFS attachments, encryption, vector ANN indexing,
+WebDAV, and a dedicated conflict-resolution/history UI remain future work.
+FTS5 uses Han bigrams for recall; it is not a specialized Chinese language analyzer.

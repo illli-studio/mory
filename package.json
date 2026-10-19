@@ -12,11 +12,11 @@
     "build": "pnpm --filter @mory/memory-core build && pnpm --filter @illli-studio/mory-client-internal build && pnpm --filter @mory/web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "test": "node --test tests/*.mjs",
+    "test": "pnpm --filter @mory/memory-core build && node --test tests/*.mjs",
     "mory": "pnpm --filter @illli-studio/mory cli"
   },
   "packageManager": "pnpm@11.17.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   }
 }

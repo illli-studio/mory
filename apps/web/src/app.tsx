@@ -1116,13 +1116,13 @@ function MemoryCard({ memory, selected, onSelect, onOpen }: { memory: MemoryObje
   const [draftTags, setDraftTags] = useState(memory.tags.join(", "));
 
   async function saveEdit() {
-    await update({
+    const saved = await update({
       ...memory,
       payload: { ...memory.payload, title: draftTitle.trim() || "Untitled memory", content: draftContent.trim() },
       tags: draftTags.split(",").map((tag) => tag.trim()).filter(Boolean),
       preview: createPreview(draftContent),
     });
-    setEditing(false);
+    if (saved) setEditing(false);
   }
 
   return (
@@ -1200,13 +1200,13 @@ function MemoryDetailDrawer({
   const [tags, setTags] = useState(memory.tags.join(", "));
 
   async function save() {
-    await update({
+    const saved = await update({
       ...memory,
       payload: { title: title.trim() || "Untitled memory", content: content.trim(), url: url.trim() || undefined },
       tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
       preview: createPreview(content),
     });
-    onClose();
+    if (saved) onClose();
   }
 
   return (

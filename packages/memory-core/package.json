@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./protocol": { "types": "./protocol.d.mts", "import": "./protocol.mjs" },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

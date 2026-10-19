@@ -4,6 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch server.mjs",
-    "start": "node server.mjs"
-  }
+    "start": "node server.mjs",
+    "typecheck": "node --check server.mjs && node --check repository.mjs && node --check github-backup.mjs",
+    "lint": "node --check server.mjs && node --check repository.mjs && node --check github-backup.mjs"
+  },
+  "dependencies": { "@mory/memory-core": "workspace:*" }
 }

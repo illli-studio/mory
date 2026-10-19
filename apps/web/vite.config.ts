@@ -4,6 +4,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: { output: { manualChunks: { vendor: ["react", "react-dom", "dexie", "zustand"] } } },
+  },
   server: {
     port: 5173,
     proxy: {

@@ -1,10 +1,10 @@
-import type { MemoryObject } from "@mory/memory-core";
+import { mergeSnapshots, normalizeMemory, type MemoryObject } from "@mory/memory-core";
 
 export type SyncProvider = "" | "github" | "gitee";
 export interface GithubSyncConfig { provider: SyncProvider; token: string; owner: string; repo: string; branch: string; path: string; autoSync: boolean; deviceName: string; }
 interface RemoteFileResponse { content: string; encoding: string; sha: string; }
 export interface SyncEnvelope { schemaVersion: 2; exportedAt: string; memories: MemoryObject[]; tombstones: string[]; }
-export interface SyncResult { message: string; uploadedCount?: number; }
+export interface SyncResult { message: string; uploadedCount?: number; snapshot: SyncEnvelope; }
 export interface RepositoryConnection { owner: string; repo: string; branch: string; }
 export class SyncConflictError extends Error {
   constructor() {
@@ -36,47 +36,62 @@ export async function checkGithubConnection(config: GithubSyncConfig): Promise<{
   return { branch: repository.default_branch ?? "main" };
 }
 
-export async function pullGithubSnapshot(config: GithubSyncConfig): Promise<SyncEnvelope> { const normalized = normalizeGithubConfig(config); const file = await fetchRemoteFile(normalized); if (!file) throw new Error(`GitHub memory file not found: ${normalized.path}`); const parsed = JSON.parse(decodeBase64(file.content)) as Partial<SyncEnvelope> | MemoryObject[]; if (Array.isArray(parsed)) return defaultSyncEnvelope(parsed); return { schemaVersion: 2, exportedAt: parsed.exportedAt ?? new Date().toISOString(), memories: Array.isArray(parsed.memories) ? parsed.memories : [], tombstones: Array.isArray(parsed.tombstones) ? parsed.tombstones : [] }; }
+export async function parseSyncSnapshot(value: unknown): Promise<SyncEnvelope> {
+  const parsed = Array.isArray(value) ? { memories: value, tombstones: [] } : value as Partial<SyncEnvelope> | null;
+  if (parsed && "schemaVersion" in parsed && parsed.schemaVersion !== undefined && ![1, 2, 3].includes(parsed.schemaVersion)) throw new Error("Unsupported remote snapshot version. Local data was preserved.");
+  if (!parsed || !Array.isArray(parsed.memories) || (parsed.tombstones !== undefined && (!Array.isArray(parsed.tombstones) || parsed.tombstones.some(id => typeof id !== "string")))) throw new Error("Invalid remote memory snapshot. Local data was preserved.");
+  const memories = await Promise.all(parsed.memories.map(normalizeMemory));
+  const tombstones = [...new Set([...(parsed.tombstones ?? []), ...memories.filter(m => m.status !== "active").map(m => m.id)])];
+  return defaultSyncEnvelope(memories.filter(m => m.status === "active" && !tombstones.includes(m.id)), tombstones);
+}
+async function readSnapshot(config: GithubSyncConfig) {
+  const file = await fetchRemoteFile(config);
+  return { sha: file?.sha, snapshot: file ? await parseSyncSnapshot(JSON.parse(decodeBase64(file.content))) : defaultSyncEnvelope([]) };
+}
+export async function pullGithubSnapshot(config: GithubSyncConfig): Promise<SyncEnvelope> {
+  return (await readSnapshot(normalizeGithubConfig(config))).snapshot;
+}
 export async function pullGithubMemories(config: GithubSyncConfig): Promise<MemoryObject[]> { return (await pullGithubSnapshot(config)).memories; }
 
 export async function pushGithubMemories(config: GithubSyncConfig, memories: MemoryObject[], tombstones: string[] = []): Promise<SyncResult> {
   const normalized = normalizeGithubConfig(config);
-  let existing = await fetchRemoteFile(normalized);
+  const local = await parseSyncSnapshot(defaultSyncEnvelope(memories, tombstones));
   for (let attempt = 0; attempt < 6; attempt += 1) {
+    // The content and SHA must come from the same read. On 409, re-read and merge again.
+    const remote = await readSnapshot(normalized);
+    const snapshot = mergeSnapshots(local, remote.snapshot);
     let response: Response;
     try {
       response = await fetch(remoteEndpoint(normalized, false), {
-        method: "PUT",
-        headers: remoteHeaders(normalized),
-        body: JSON.stringify({
-          message: `sync: update Mory memories (${memories.length})`,
-          content: encodeBase64(JSON.stringify(defaultSyncEnvelope(memories, tombstones), null, 2)),
-          branch: normalized.branch,
-          ...(existing?.sha ? { sha: existing.sha } : {}),
-          ...(normalized.provider === "gitee" ? { access_token: normalized.token } : {}),
-        }),
+        method: "PUT", headers: remoteHeaders(normalized), signal: AbortSignal.timeout(30_000),
+        body: JSON.stringify({ message: `sync: update Mory memories (${snapshot.memories.length})`,
+          content: encodeBase64(JSON.stringify(snapshot, null, 2)), branch: normalized.branch,
+          ...(remote.sha ? { sha: remote.sha } : {}), ...(normalized.provider === "gitee" ? { access_token: normalized.token } : {}) }),
       });
     } catch (error) {
       if (attempt === 5) throw error;
-      await retryDelay(attempt);
-      continue;
+      await retryDelay(attempt); continue;
     }
-    if (response.ok) return { message: `Pushed local memories to ${normalized.provider === "gitee" ? "Gitee" : "GitHub"}.`, uploadedCount: memories.length };
+    if (response.ok) return { message: `Synced with ${normalized.provider === "gitee" ? "Gitee" : "GitHub"}.`, uploadedCount: snapshot.memories.length, snapshot };
     const message = await remoteError(response, normalized.provider);
-    if (response.status === 409 && attempt === 5) throw new SyncConflictError();
-    if (attempt === 5 || (![408, 409, 429].includes(response.status) && response.status < 500)) throw new Error(message);
-    if (response.status === 409) existing = await fetchRemoteFile(normalized);
-    else await retryDelay(attempt);
+    if (response.status === 409 || response.status === 422) {
+      if (attempt === 5) throw new SyncConflictError();
+      await retryDelay(attempt); continue;
+    }
+    if (attempt === 5 || (![408, 429].includes(response.status) && response.status < 500)) throw new Error(message);
+    await retryDelay(attempt);
   }
-  throw new Error(`${normalized.provider} push failed.`);
+  throw new SyncConflictError();
 }
-
-export async function mergeGithubMemories(config: GithubSyncConfig, localMemories: MemoryObject[], localTombstones: string[] = []) { const remote = await pullGithubSnapshot(config); const tombstones = new Set([...remote.tombstones, ...localTombstones]); const byId = new Map<string, MemoryObject>(); for (const memory of [...remote.memories, ...localMemories]) { if (tombstones.has(memory.id)) continue; const existing = byId.get(memory.id); if (!existing || (memory.updatedAt ?? memory.capturedAt) >= (existing.updatedAt ?? existing.capturedAt)) byId.set(memory.id, memory); } return { memories: Array.from(byId.values()).sort((a, b) => b.capturedAt.localeCompare(a.capturedAt)), tombstones: Array.from(tombstones) }; }
+export async function mergeGithubMemories(config: GithubSyncConfig, localMemories: MemoryObject[], localTombstones: string[] = []) {
+  const local = await parseSyncSnapshot(defaultSyncEnvelope(localMemories, localTombstones));
+  return mergeSnapshots(local, await pullGithubSnapshot(config));
+}
 
 async function fetchRemoteFile(config: GithubSyncConfig): Promise<RemoteFileResponse | null> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const response = await fetch(remoteEndpoint(config, true), { headers: remoteHeaders(config) });
+      const response = await fetch(remoteEndpoint(config, true), { headers: remoteHeaders(config), signal: AbortSignal.timeout(30_000) });
       if (response.status === 404) return null;
       if (response.ok) return (await response.json()) as RemoteFileResponse;
       const message = await remoteError(response, config.provider);

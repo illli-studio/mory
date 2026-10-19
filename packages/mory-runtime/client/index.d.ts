@@ -29,6 +29,7 @@ export declare class MoryClient {
     list(options?: {
         projectId?: string;
         limit?: number;
+        offset?: number;
     }): Promise<{
         memories: unknown[];
         total: number;
@@ -46,6 +47,7 @@ export declare class MoryClient {
     update(id: string, input: Partial<RememberInput> & {
         title?: string;
         tags?: string[];
+        expectedRevision?: number;
     }): Promise<Record<string, unknown>>;
     forget(id: string): Promise<{
         ok: boolean;

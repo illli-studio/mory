@@ -1,7 +1,7 @@
-import { computeStats, createMemory, matchesMemory, type CreateMemoryInput, type MemoryKind, type MemoryObject } from "@mory/memory-core";
+import { computeStats, createMemory, matchesMemory, mergeSnapshots, type CreateMemoryInput, type MemoryKind, type MemoryObject } from "@mory/memory-core";
 import { create } from "zustand";
-import { clearMemories, deleteMemory, loadMemories, saveMemory, updateMemory, upsertMemories } from "./db";
-import { hasGithubConfig, mergeGithubMemories, pullGithubSnapshot, pushGithubMemories, SyncConflictError, type GithubSyncConfig } from "./github-sync";
+import { applyRepositorySnapshot, clearMemories, deleteMemory, importMemoryBatch, loadMemories, loadRepositorySnapshot, saveMemory, updateMemory } from "./db";
+import { hasGithubConfig, pullGithubSnapshot, pushGithubMemories, type GithubSyncConfig } from "./github-sync";
 
 const defaultGithubConfig: GithubSyncConfig = {
   provider: "",
@@ -30,7 +30,7 @@ interface MemoryState {
   load: () => Promise<void>;
   add: (input: CreateMemoryInput) => Promise<boolean>;
   importMany: (inputs: CreateMemoryInput[]) => Promise<void>;
-  update: (memory: MemoryObject) => Promise<void>;
+  update: (memory: MemoryObject) => Promise<boolean>;
   remove: (id: string) => Promise<void>;
   clear: () => Promise<void>;
   updateGithub: (config: Partial<GithubSyncConfig>) => void;
@@ -62,11 +62,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     try {
       const loaded = (await loadMemories()).map(normalizeMemory);
       set({ memories: loaded, isLoading: false });
-      // A newly installed runtime can have an empty SQLite repository while the
-      // configured GitHub repository already contains the user's memories. Do a
-      // one-time merge in that case so switching storage backends does not hide
-      // the remote history. Existing local data still respects autoSync.
-      if (hasGithubConfig(get().github) && (get().github.autoSync || loaded.length === 0)) void get().mergeGithub();
+      // Loading never uploads data unless automatic sync was explicitly enabled.
+      if (hasGithubConfig(get().github) && get().github.autoSync) void get().mergeGithub();
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load memories.", isLoading: false });
     }
@@ -77,8 +74,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       const memory = await createMemory(input);
       memory.origin = getDeviceOrigin(get().github.deviceName);
       memory.updatedAt = new Date().toISOString();
-      await saveMemory(memory);
-      set({ memories: [memory, ...get().memories] });
+      const saved = await saveMemory(memory);
+      set({ memories: [saved, ...get().memories] });
       queueAutoSync(get);
       return true;
     } catch (error) {
@@ -91,16 +88,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     try {
       const created = await Promise.all(inputs.map((input) => createMemory(input)));
       created.forEach((memory) => { memory.origin = getDeviceOrigin(get().github.deviceName); memory.updatedAt = new Date().toISOString(); });
-      let savedCount = 0;
-      let skippedCount = 0;
-      for (const memory of created) {
-        try {
-          await saveMemory(memory);
-          savedCount += 1;
-        } catch {
-          skippedCount += 1;
-        }
-      }
+      const result = await importMemoryBatch(created);
+      const savedCount = result.addedCount;
+      const skippedCount = result.duplicateCount;
       const detail = skippedCount ? ` Skipped ${skippedCount} duplicate${skippedCount === 1 ? "" : "s"}.` : "";
       set({ memories: (await loadMemories()).map(normalizeMemory), syncMessage: `Imported ${savedCount} memory object${savedCount === 1 ? "" : "s"}.${detail}` });
       queueAutoSync(get);
@@ -110,22 +100,29 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   },
   async update(memory) {
     const next = { ...memory, origin: memory.origin ?? getDeviceOrigin(get().github.deviceName), updatedAt: new Date().toISOString() };
-    await updateMemory(next);
-    set({ memories: get().memories.map((item) => (item.id === next.id ? next : item)) });
+    try {
+      const saved = await updateMemory(next);
+      set({ memories: get().memories.map((item) => (item.id === saved.id ? saved : item)), error: undefined });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : "Update failed." });
+      return false;
+    }
     queueAutoSync(get);
+    return true;
   },
   async remove(id) {
-    await deleteMemory(id);
-    set({ memories: get().memories.filter((memory) => memory.id !== id) });
-    addTombstone(id);
-    queueAutoSync(get);
+    try {
+      await deleteMemory(id, get().memories.find(memory => memory.id === id)?.revision);
+      set({ memories: get().memories.filter((memory) => memory.id !== id), error: undefined });
+      queueAutoSync(get);
+    } catch (error) { set({ error: error instanceof Error ? error.message : "Delete failed." }); }
   },
   async clear() {
-    const ids = get().memories.map((memory) => memory.id);
-    await clearMemories();
-    set({ memories: [] });
-    ids.forEach(addTombstone);
-    queueAutoSync(get);
+    try {
+      await clearMemories();
+      set({ memories: [], error: undefined });
+      queueAutoSync(get);
+    } catch (error) { set({ error: error instanceof Error ? error.message : "Clear failed." }); }
   },
   updateGithub(config) {
     const github = { ...get().github, ...config };
@@ -133,105 +130,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     localStorage.setItem("mory.github", JSON.stringify(github));
     set({ github });
   },
-  async pushGithub() {
-    const { github, memories } = get();
-    if (!hasGithubConfig(github)) {
-      set({ error: "GitHub sync needs token, owner, repo, branch and path." });
-      return;
-    }
-    if (syncInFlight) return;
-    syncInFlight = true;
-    set({ error: undefined, syncMessage: "Pushing memories to GitHub..." });
-    try {
-      const result = await pushGithubMemories(github, memories);
-      localStorage.setItem("mory.sync.tombstones", JSON.stringify([]));
-      const uploadedCount = result.uploadedCount ?? memories.length;
-      set({ syncMessage: `Pushed ${uploadedCount} memory objects to ${github.provider === "gitee" ? "Gitee" : "GitHub"}.` });
-    } catch (error) {
-      if (error instanceof SyncConflictError) {
-        set({ error: undefined, syncMessage: "Merging local and remote memories..." });
-        queueConflictRetry(get);
-        return;
-      }
-      set({ error: error instanceof Error ? error.message : "GitHub push failed.", syncMessage: undefined });
-    } finally {
-      syncInFlight = false;
-    }
-  },
-  async pullGithub() {
-    const { github, memories: localMemories } = get();
-    if (!hasGithubConfig(github)) {
-      set({ error: "GitHub sync needs token, owner, repo, branch and path." });
-      return;
-    }
-    if (syncInFlight) return;
-    syncInFlight = true;
-    set({ error: undefined, syncMessage: "Pulling memories from the remote repository..." });
-    try {
-      const remoteSnapshot = await pullGithubSnapshot(github);
-      const remoteMemories = remoteSnapshot.memories;
-      const remoteTombstones = new Set(remoteSnapshot.tombstones);
-      const localById = new Map(localMemories.map((memory) => [memory.id, memory]));
-      const conflicts = remoteMemories.filter((remote) => {
-        const local = localById.get(remote.id);
-        return local && local.contentHash !== remote.contentHash;
-      }).length;
-      const merged = new Map(Array.from(localById).filter(([id]) => !remoteTombstones.has(id)));
-
-      for (const remote of remoteMemories) {
-        if (!merged.has(remote.id)) {
-          merged.set(remote.id, remote);
-        }
-      }
-
-      const memories = Array.from(merged.values()).sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
-      await clearMemories();
-      await upsertMemories(memories);
-      localStorage.setItem("mory.sync.tombstones", JSON.stringify(remoteSnapshot.tombstones));
-      const normalized = memories.map(normalizeMemory);
-      set({ memories: normalized, syncMessage: `Pulled ${normalized.length} memory objects from ${github.provider === "gitee" ? "Gitee" : "GitHub"}.` });
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : "GitHub pull failed.", syncMessage: undefined });
-    } finally {
-      syncInFlight = false;
-    }
-  },
-  async mergeGithub() {
-    const { github, memories } = get();
-    if (!hasGithubConfig(github)) {
-      set({ error: "GitHub sync needs token, owner, repo, branch and path." });
-      return;
-    }
-    if (syncInFlight) return;
-    syncInFlight = true;
-    set({ error: undefined, syncMessage: "Merging local and remote memories..." });
-    try {
-      let merged: Awaited<ReturnType<typeof mergeGithubMemories>> | undefined;
-      for (let attempt = 0; attempt < 4 && !merged; attempt += 1) {
-        const candidate = await mergeGithubMemories(github, memories, loadTombstones());
-        try {
-          await pushGithubMemories(github, candidate.memories, candidate.tombstones);
-          merged = candidate;
-        } catch (error) {
-          if (!(error instanceof SyncConflictError) || attempt === 3) throw error;
-        }
-      }
-      if (!merged) throw new SyncConflictError();
-      await clearMemories();
-      await upsertMemories(merged.memories);
-      set({ memories: merged.memories, syncMessage: `Merged and pushed ${merged.memories.length} memory objects.` });
-      localStorage.setItem("mory.sync.tombstones", JSON.stringify(merged.tombstones));
-    } catch (error) {
-      if (error instanceof SyncConflictError) {
-        set({ error: undefined, syncMessage: "Merging local and remote memories..." });
-        queueConflictRetry(get);
-        return;
-      }
-      set({ error: error instanceof Error ? error.message : "GitHub merge failed.", syncMessage: undefined });
-    } finally {
-      syncInFlight = false;
-    }
-  },
+  async pushGithub() { await synchronize("push"); },
+  async pullGithub() { await synchronize("pull"); },
+  async mergeGithub() { await synchronize("merge"); },
   setQuery(query) {
     set({ query });
   },
@@ -277,9 +178,8 @@ export function selectFilteredMemories(state: MemoryState): MemoryObject[] {
 function normalizeMemory(memory: MemoryObject): MemoryObject {
   const candidate = memory as Partial<MemoryObject> & { payload?: Partial<MemoryObject["payload"]>; origin?: Partial<NonNullable<MemoryObject["origin"]>> };
   const payload = (candidate.payload ?? {}) as Partial<MemoryObject["payload"]>;
-  const validSources = ["manual", "clipboard", "browser", "file", "chat", "github"] as const;
   const validTypes = ["raw", "preview", "snapshot", "relation"] as const;
-  const source = validSources.includes(candidate.source as typeof validSources[number]) ? candidate.source! : "manual";
+  const source = typeof candidate.source === "string" && candidate.source ? candidate.source : "manual";
   const type = validTypes.includes(candidate.type as typeof validTypes[number]) ? candidate.type! : "raw";
 
   return {
@@ -320,14 +220,14 @@ function matchesTimeRange(capturedAt: string, range: MemoryState["timeRange"], n
   const dayMs = 24 * 60 * 60 * 1000;
 
   if (range === "today") {
-    return captured.toISOString().slice(0, 10) === now.toISOString().slice(0, 10);
+    return captured.toDateString() === now.toDateString();
   }
 
   if (range === "week") {
-    return diffMs <= 7 * dayMs;
+    return diffMs >= 0 && diffMs <= 7 * dayMs;
   }
 
-  return diffMs <= 30 * dayMs;
+  return diffMs >= 0 && diffMs <= 30 * dayMs;
 }
 
 function loadGithubConfig(): GithubSyncConfig {
@@ -345,24 +245,35 @@ function getDeviceOrigin(deviceName: string) {
   return { deviceId, deviceName: deviceName || localStorage.getItem("mory.deviceName") || navigator.platform || "This device" };
 }
 
-function loadTombstones(): string[] {
-  try { return JSON.parse(localStorage.getItem("mory.sync.tombstones") ?? "[]") as string[]; } catch { return []; }
-}
-
-function addTombstone(id: string): void {
-  const tombstones = new Set(loadTombstones()); tombstones.add(id); localStorage.setItem("mory.sync.tombstones", JSON.stringify(Array.from(tombstones)));
-}
-
 let autoSyncTimer: number | undefined;
 let syncInFlight = false;
+let syncAgain = false;
+async function synchronize(direction: "push" | "pull" | "merge") {
+  const { github } = useMemoryStore.getState();
+  if (!hasGithubConfig(github)) { useMemoryStore.setState({ error: "Configure the remote repository before syncing." }); return; }
+  if (syncInFlight) { syncAgain = true; return; }
+  syncInFlight = true;
+  useMemoryStore.setState({ error: undefined, syncMessage: "Syncing memories..." });
+  try {
+    const local = await loadRepositorySnapshot();
+    const result = direction === "pull"
+      ? mergeSnapshots(local, await pullGithubSnapshot(github))
+      : (await pushGithubMemories(github, local.memories, local.tombstones)).snapshot;
+    // A repository switch during the request must not apply the previous connection's snapshot.
+    const current = useMemoryStore.getState().github;
+    if (["provider", "owner", "repo", "branch", "path"].some(key => current[key as keyof GithubSyncConfig] !== github[key as keyof GithubSyncConfig])) return;
+    const applied = await applyRepositorySnapshot({ ...local, ...result }, local.generation);
+    const conflictCount = applied.memories.filter(memory => memory.id.includes("~conflict~")).length;
+    useMemoryStore.setState({ memories: applied.memories.map(normalizeMemory), syncMessage: `Synced ${applied.memories.length} memories.${conflictCount ? ` ${conflictCount} conflicting copies retained for review.` : ""}` });
+  } catch (error) {
+    useMemoryStore.setState({ error: error instanceof Error ? error.message : "Sync failed. Local data was preserved.", syncMessage: undefined });
+  } finally {
+    syncInFlight = false;
+    if (syncAgain) { syncAgain = false; window.setTimeout(() => void synchronize("merge"), 1200); }
+  }
+}
 function queueAutoSync(get: () => MemoryState): void {
   if (!get().github.autoSync || !hasGithubConfig(get().github)) return;
   window.clearTimeout(autoSyncTimer);
   autoSyncTimer = window.setTimeout(() => void get().mergeGithub(), 1200);
-}
-
-function queueConflictRetry(get: () => MemoryState): void {
-  if (!get().github.autoSync || !hasGithubConfig(get().github)) return;
-  window.clearTimeout(autoSyncTimer);
-  autoSyncTimer = window.setTimeout(() => void get().mergeGithub(), 5000);
 }

@@ -29,7 +29,7 @@ async function waitForServer() {
 
 before(async () => {
   dataDir = await mkdtemp(join(tmpdir(), "mory-smoke-"));
-  processHandle = spawn(process.execPath, ["apps/api/server.mjs"], { env: { ...process.env, MORY_PORT: String(port), MORY_API_TOKEN: token, MORY_DATABASE: join(dataDir, "mory.sqlite") }, stdio: "ignore" });
+  processHandle = spawn(process.execPath, ["apps/api/server.mjs"], { env: { ...process.env, MORY_PORT: String(port), MORY_API_TOKEN: token, MORY_DATABASE: join(dataDir, "mory.sqlite"), MORY_LLM_API_KEY: "", MORY_EMBEDDING_API_KEY: "" }, stdio: "ignore" });
   await waitForServer();
 });
 
@@ -45,7 +45,7 @@ after(async () => {
 
 test("memory lifecycle and export/import contract", async () => {
   const health = await request("/health", { method: "GET" });
-  assert.equal(health.schemaVersion, 1);
+  assert.equal(health.schemaVersion, 2);
   const remembered = await request("/v1/memories/remember", { method: "POST", body: JSON.stringify({ text: "The Mory smoke test remembers durable project context for future agents.", source: "test", scope: { projectId: "smoke" } }) });
   assert.equal(remembered.addedCount, 1);
   const memoryId = remembered.memories[0].id;
@@ -79,4 +79,19 @@ test("MCP stdio exposes the memory tools", async () => {
   const messages = (await output).trim().split("\n").map((line) => JSON.parse(line));
   assert.equal(messages[0].result.serverInfo.name, "mory");
   assert.ok(messages[1].result.tools.some((tool) => tool.name === "mory_context"));
+});
+
+
+test("HTTP pagination and complete snapshot include more than fifty memories", async () => {
+  const memories = Array.from({ length: 57 }, (_, index) => ({ id: `page-${index}`, text: `Pagination record ${index}`, scope: { projectId: "pagination" } }));
+  await request("/v1/import", { method: "POST", body: JSON.stringify({ memories }) });
+  const first = await request("/v1/memories?projectId=pagination&limit=50");
+  assert.equal(first.memories.length, 50);
+  assert.equal(first.total, 57);
+  assert.equal(first.nextOffset, 50);
+  const last = await request("/v1/memories?projectId=pagination&limit=50&offset=50");
+  assert.equal(last.memories.length, 7);
+  assert.equal(new Set([...first.memories, ...last.memories].map(memory => memory.id)).size, 57);
+  const snapshot = await request("/v1/snapshot");
+  assert.equal(snapshot.memories.filter(memory => memory.scope.projectId === "pagination").length, 57);
 });
