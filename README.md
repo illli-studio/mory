@@ -2,6 +2,8 @@
   <a href="https://mory.cloud/"><img src="docs/branding/readme-header.svg" alt="Mory — Your Personal Memory Operating System" width="760"></a>
 </p>
 
+<p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
+
 <h3 align="center">Let AI finally remember.</h3>
 
 <p align="center">
