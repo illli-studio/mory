@@ -1,5 +1,5 @@
 const protocolVersion = "2025-06-18";
-const runtimeVersion = "0.1.14";
+const runtimeVersion = "0.1.15";
 
 async function callApi(baseUrl, token, path, method = "POST", body) {
   const response = await fetch(baseUrl.replace(/\/$/, "") + path, { method, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });

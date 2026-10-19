@@ -11,7 +11,9 @@ MCP 提供读写记忆的工具，`mory-memory` skill 告诉 AI 什么时候检�
 
 1. Follow the [local service and MCP setup](../skills/mory-memory/references/setup.md).
    先安装并启动本地 Mory，再配置 AI 助手的 MCP 连接。
-2. Download or clone this repository and copy the complete
+2. With npm package version 0.1.15 or newer, run `npm root -g` and find
+   `@illli-studio/mory/skills/mory-memory/` inside that directory.
+   Alternatively, download or clone this repository and copy the complete
    [`skills/mory-memory`](../skills/mory-memory) folder into your assistant's
    skill directory. Keep `SKILL.md` and `references/setup.md` together.
    下载或克隆仓库，将整个文件夹复制到助手的 skill 目录，保留其内部结构。
@@ -21,9 +23,9 @@ MCP 提供读写记忆的工具，`mory-memory` skill 告诉 AI 什么时候检�
 3. Reload the assistant so it discovers the skill and MCP tools.
    重新加载助手，确认 skill 和 Mory 工具都已发现。
 
-The repository includes the skill source; it is not currently installed by
-`npm install -g @illli-studio/mory`.
-仓库提供 skill 源文件；目前 npm 安装本地服务不会自动安装 skill。
+The npm package includes the skill files starting with version 0.1.15, but does
+not automatically install them into an assistant's skill directory.
+从 0.1.15 起，npm 包随附 skill 文件，但仍需手动复制到助手的 skill 目录。
 
 ## Try it / 试用
 

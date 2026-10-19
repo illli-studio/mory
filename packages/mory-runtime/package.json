@@ -1,6 +1,6 @@
 {
   "name": "@illli-studio/mory",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Local-first memory runtime with a web console and MCP server.",
   "license": "AGPL-3.0-or-later",
   "publishConfig": {
@@ -26,6 +26,7 @@
     "src",
     "bundle",
     "client",
+    "skills",
     "README.md"
   ],
   "scripts": {

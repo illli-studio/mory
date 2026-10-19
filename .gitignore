@@ -14,3 +14,4 @@ mory-*.tgz
 illli-studio-mory-*.tgz
 .pack-check/
 packages/mory-runtime/bundle/
+packages/mory-runtime/skills/

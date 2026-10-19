@@ -18,4 +18,5 @@ for (const name of ["server.mjs", "repository.mjs", "github-backup.mjs"]) {
 }
 await cp(join(repoRoot, "packages", "memory-core", "protocol.mjs"), join(bundle, "protocol.mjs"));
 await cp(join(repoRoot, "apps", "web", "dist"), join(bundle, "web"), { recursive: true });
+await cp(join(repoRoot, "skills", "mory-memory"), join(packageRoot, "skills", "mory-memory"), { recursive: true });
 console.log("Mory runtime bundle prepared.");

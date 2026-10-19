@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { runMcp } from "./mcp.mjs";
 
 const packageRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const runtimeVersion = "0.1.14";
+const runtimeVersion = "0.1.15";
 const repoRoot = resolve(packageRoot, "../..");
 const dataDir = process.env.MORY_HOME || join(homedir(), ".mory");
 const configPath = join(dataDir, "config.json");
