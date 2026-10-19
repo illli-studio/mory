@@ -55,6 +55,12 @@ Instead of asking AI to remember you,
 
 Mory gives you ownership of your own memory.
 
+<p align="center">
+  <a href="docs/branding/mory-memory-journey.png"><img src="docs/branding/mory-memory-journey.png" alt="The Mory vision: save useful moments from everyday life on your device, connect projects, decisions and preferences, and give your AI context to pick up where you left off." width="100%"></a>
+</p>
+
+<p align="center"><sub>The Mory vision — automatic capture and richer connections are still on the roadmap.</sub></p>
+
 ---
 
 ## Vision
