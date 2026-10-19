@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Mory</title>
+  <desc id="desc">你的个人记忆操作系统。以森林绿、鼠尾草绿和温暖米白呈现层叠记忆卡片。</desc>
+  <rect width="1200" height="380" rx="28" fill="#F5F1E7"/>
+  <circle cx="1100" cy="30" r="230" stroke="#0B3B32" stroke-opacity=".05"/>
+  <circle cx="1100" cy="30" r="170" stroke="#0B3B32" stroke-opacity=".05"/>
+  <circle cx="80" cy="380" r="150" stroke="#0B3B32" stroke-opacity=".05"/>
+  <g transform="translate(163 83)">
+    <rect width="210" height="210" rx="50" fill="#0B3B32"/>
+    <rect x="47" y="32" width="143" height="164" rx="28" transform="rotate(12 118 114)" fill="#2C6870"/>
+    <rect x="30" y="29" width="143" height="164" rx="28" transform="rotate(7 101 111)" fill="#9BB5A0"/>
+    <rect x="23" y="22" width="140" height="166" rx="28" transform="rotate(-2 93 105)" fill="#F5F1E7"/>
+    <g transform="rotate(-2 93 105)" fill="#0B3B32" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="40" letter-spacing="-3">
+      <text x="33" y="97">ME.</text>
+      <text x="33" y="138">MORY</text>
+    </g>
+  </g>
+  <text x="422" y="220" fill="#0B3B32" font-family="Georgia, 'Times New Roman', serif" font-size="142" font-weight="700" letter-spacing="-8">mory</text>
+  <text x="429" y="267" fill="#476356" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="23" letter-spacing=".2">你的个人记忆操作系统。</text>
+  <path d="M429 294H488" stroke="#9BB5A0" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="502" cy="294" r="3" fill="#2C6870"/>
+</svg>

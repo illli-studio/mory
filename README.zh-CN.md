@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://mory.cloud/"><img src="docs/branding/readme-header.svg" alt="Mory — 你的个人记忆操作系统" width="760"></a>
+  <a href="https://mory.cloud/"><img src="docs/branding/readme-header.zh-CN.svg" alt="Mory — 你的个人记忆操作系统" width="760"></a>
 </p>
 
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
@@ -58,7 +58,7 @@ Mory 正在构建一个**个人记忆操作系统**——把你希望 AI 记住�
 Mory 让你拥有自己的记忆。
 
 <p align="center">
-  <a href="docs/branding/mory-memory-journey.png"><img src="docs/branding/mory-memory-journey.png" alt="Mory 的愿景：把日常生活中有用的片段保存在自己的设备上，串联项目、决策和偏好，为 AI 提供背景信息，让事情从上次停下的地方继续。" width="100%"></a>
+  <a href="docs/branding/mory-memory-journey.zh-CN.png"><img src="docs/branding/mory-memory-journey.zh-CN.png" alt="Mory 的愿景：把日常生活中有用的片段保存在自己的设备上，串联项目、决策和偏好，为 AI 提供背景信息，让事情从上次停下的地方继续。" width="100%"></a>
 </p>
 
 <p align="center"><sub>Mory 的愿景——自动采集和更丰富的记忆关联仍在路线图中。</sub></p>
