@@ -6581,6 +6581,10 @@ body {
   gap: 6px !important;
 }
 
+.record-nav-list + .record-nav-list {
+  margin-top: 6px;
+}
+
 .context-actions {
   gap: 10px !important;
 }
