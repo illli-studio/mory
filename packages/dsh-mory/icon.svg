@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_图层_1" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 427.87 427.87">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: #0b3b32;
+      }
+
+      .cls-3 {
+        font-family: AdobeSongStd-Light-GBpc-EUC-H, 'Adobe Song Std';
+        font-weight: 300;
+        letter-spacing: -.1em;
+      }
+
+      .cls-4 {
+        fill: #f5f1e7;
+      }
+
+      .cls-5, .cls-6 {
+        letter-spacing: -.1em;
+      }
+
+      .cls-6, .cls-7 {
+        font-family: CooperBlack, 'Cooper Black';
+      }
+
+      .cls-2 {
+        font-size: 86px;
+      }
+
+      .cls-8 {
+        fill: #9bb5a0;
+      }
+
+      .cls-9 {
+        letter-spacing: -.15em;
+      }
+
+      .cls-10 {
+        fill: #2c6870;
+      }
+    </style>
+  </defs>
+  <rect class="cls-1" x="0" y="0" width="427.87" height="427.87" rx="102.32" ry="102.32"/>
+  <g>
+    <rect class="cls-10" x="61.29" y="68.46" width="351.95" height="290.95" rx="68.04" ry="68.04" transform="translate(-21.32 401.54) rotate(-78)"/>
+    <rect class="cls-8" x="25.31" y="68.46" width="358.99" height="290.95" rx="68.04" ry="68.04" transform="translate(-32.5 391.14) rotate(-83)"/>
+    <rect class="cls-4" x="45.86" y="45" width="286.26" height="337.88" rx="56.31" ry="56.31" transform="translate(-7.35 6.73) rotate(-2)"/>
+  </g>
+  <text class="cls-2" transform="translate(64.68 198.47) rotate(-1.97)"><tspan class="cls-6" x="0" y="0">ME</tspan><tspan class="cls-3" x="118.74" y="0">.</tspan><tspan class="cls-7"><tspan class="cls-5" x="0" y="83">MO</tspan><tspan class="cls-9" x="126.26" y="83">R</tspan><tspan class="cls-5" x="180.32" y="83">Y</tspan></tspan></text>
+</svg>

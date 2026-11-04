@@ -81,6 +81,8 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
 
+  packages/dsh-mory: {}
+
   packages/memory-client:
     devDependencies:
       typescript:

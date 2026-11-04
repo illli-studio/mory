@@ -281,6 +281,15 @@ The skill uses the MCP tools and requires the connection above.
 
 </details>
 
+### Use Mory in DeepSeek Harness
+
+The [Mory DSH plugin](packages/dsh-mory/README.md) adds a native sidebar panel and
+a `mory_memory` agent tool backed by the same local repository. Start the Mory
+service on the computer hosting DSH (`mory start --background`), then use DSH's
+plugin manager to install the absolute path to this checkout's `packages/dsh-mory`
+directory. Requires DSH `>=0.2.1-rc.5 <0.3.0`; no additional MCP connection is needed.
+The browser-only online repository is not automatically connected.
+
 For background operation, moving data, web deployment, or contributing code,
 see the [setup guide](docs/GETTING_STARTED.md).
 Developers can also read the [API guide](docs/API.md).

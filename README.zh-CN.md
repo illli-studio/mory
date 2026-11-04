@@ -276,6 +276,14 @@ mory start
 
 </details>
 
+### 在 DeepSeek Harness 中使用 Mory
+
+[Mory DSH 插件](packages/dsh-mory/README.md) 提供原生侧栏页面和 `mory_memory`
+智能体工具，与本地 Mory 共用同一个记忆库。在运行 DSH 的电脑上启动 Mory 服务
+（`mory start --background`），然后通过 DSH 插件管理器安装本项目中
+`packages/dsh-mory` 目录的绝对路径。需要 DSH `>=0.2.1-rc.5 <0.3.0`，无需额外
+配置 MCP。在线浏览器版本的记忆库不会自动连接。
+
 有关后台运行、数据迁移、网页部署或贡献代码，
 请参阅[安装与开发指南](docs/GETTING_STARTED.md)。
 开发者也可以阅读 [API 指南](docs/API.md)。

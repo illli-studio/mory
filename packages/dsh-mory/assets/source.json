@@ -1,0 +1,6 @@
+{
+  "stylesheet": "apps/web/src/styles.css",
+  "logo": "apps/web/public/mory-logo-premium.svg",
+  "stylesheetSha256": "6f7b05e7fa7fba6b0e9f6b64f9505eb3079b65503258dd967af7d49b7a25c3b5",
+  "logoSha256": "066a45748d7faff7a5946870335c1ab60cee2c45d2dfe3dbaf195501e3b228ba"
+}

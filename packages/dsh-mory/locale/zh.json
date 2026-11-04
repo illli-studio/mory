@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Mory · 个人记忆库",
+    "description": "在左侧栏浏览、搜索和管理 Mory 记忆，让 DSH 智能体使用同一个本地记忆库。需要运行 Mory 服务。"
+  }
+}

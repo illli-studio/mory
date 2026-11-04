@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Mory — Personal Memory",
+    "description": "Browse, search and manage your Mory memories from the sidebar, and give DSH agents access to the same local repository. Requires a running Mory service."
+  }
+}
