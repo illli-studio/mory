@@ -26,14 +26,32 @@ not delete it.
 
 ## Install / 安装
 
-For a local checkout, open DSH → Plugins → install from a package/directory, and
-select the **absolute path to `packages/dsh-mory`**. Enable the bundle, then click
-**Mory** in the left sidebar. The plugin manager handles profile installation;
-do not manually edit DSH's profile manifest.
+Install the published npm package in the DSH profile you use:
 
-After this package has been published to npm, other users can install
-`@illli-studio/dsh-mory` in DSH's plugin manager. This repository change alone
-does not publish the package or add it to a third-party plugin marketplace.
+```sh
+dsh plugin --profile web add @illli-studio/dsh-mory
+```
+
+Replace `web` with your actual profile name, such as `desktop`. To reproduce
+version 0.1.2, use `@illli-studio/dsh-mory@0.1.2` as the install spec. You can
+also enter the package name in DSH → Plugins → install from a package/directory.
+Enable the bundle, then click **Mory** in the left sidebar.
+
+For development, install the **absolute path to `packages/dsh-mory`** instead.
+The plugin manager handles profile installation; do not manually edit DSH's
+profile manifest. Publishing to npm and marketplace review are separate steps.
+
+Directory compatibility declaration:
+
+```yaml
+dshTarget: 0.2.1-rc.5
+```
+
+This is the harness release exercised during development. The package declares
+`engines.dsh: ">=0.2.1-rc.5 <0.3.0"`; earlier releases are outside the declared
+support range, are blocked by that compatibility requirement, and have not been
+runtime-tested. A compatible Mory service is required separately; installation
+does not start one for you.
 
 On a first install, DSH may apply the plugin live. An update to an already loaded
 plugin module requires restarting DSH, then refreshing the existing page. In

@@ -278,11 +278,25 @@ mory start
 
 ### 在 DeepSeek Harness 中使用 Mory
 
-[Mory DSH 插件](packages/dsh-mory/README.md) 提供原生侧栏页面和 `mory_memory`
-智能体工具，与本地 Mory 共用同一个记忆库。在运行 DSH 的电脑上启动 Mory 服务
-（`mory start --background`），然后通过 DSH 插件管理器安装本项目中
-`packages/dsh-mory` 目录的绝对路径。需要 DSH `>=0.2.1-rc.5 <0.3.0`，无需额外
-配置 MCP。在线浏览器版本的记忆库不会自动连接。
+[Mory DSH 插件](packages/dsh-mory/README.md) 提供原生侧栏、共享记忆工具，以及
+外观、语言、连接和同步设置。在运行 DSH 的电脑上安装并启动 Mory 服务，再将
+已发布的插件添加到你的 DSH profile：
+
+```sh
+npm install -g @illli-studio/mory
+mory init
+mory start --background
+dsh plugin --profile web add @illli-studio/dsh-mory
+```
+
+将 `web` 换成你实际使用的 profile 名称，例如 `desktop`。也可以在 DSH 插件
+管理器中输入 `@illli-studio/dsh-mory` 安装。要复现本次送审版本，请使用
+`@illli-studio/dsh-mory@0.1.2` 作为安装目标。
+
+已测试的 Harness 版本（`dshTarget`）：`0.2.1-rc.5`；支持范围为
+`>=0.2.1-rc.5 <0.3.0`，需要 Node.js 22.18+。更早的 DSH 不在声明的支持范围内，
+会被包的兼容性要求阻止安装，且未进行运行测试。无需额外配置 MCP。在线浏览器版本的记忆库
+不会自动连接；设置和记忆访问使用 DSH 所在电脑上的 Mory 服务。
 
 有关后台运行、数据迁移、网页部署或贡献代码，
 请参阅[安装与开发指南](docs/GETTING_STARTED.md)。

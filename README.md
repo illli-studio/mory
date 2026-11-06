@@ -283,12 +283,29 @@ The skill uses the MCP tools and requires the connection above.
 
 ### Use Mory in DeepSeek Harness
 
-The [Mory DSH plugin](packages/dsh-mory/README.md) adds a native sidebar panel and
-a `mory_memory` agent tool backed by the same local repository. Start the Mory
-service on the computer hosting DSH (`mory start --background`), then use DSH's
-plugin manager to install the absolute path to this checkout's `packages/dsh-mory`
-directory. Requires DSH `>=0.2.1-rc.5 <0.3.0`; no additional MCP connection is needed.
-The browser-only online repository is not automatically connected.
+The [Mory DSH plugin](packages/dsh-mory/README.md) adds a native sidebar panel,
+shared memory tools, and settings for appearance, language, connections and sync.
+On the computer hosting DSH, install and start the Mory service, then add the
+published plugin to your DSH profile:
+
+```sh
+npm install -g @illli-studio/mory
+mory init
+mory start --background
+dsh plugin --profile web add @illli-studio/dsh-mory
+```
+
+Replace `web` with your actual profile name (for example, `desktop`). You can
+also enter `@illli-studio/dsh-mory` in DSH's plugin manager. To reproduce the
+reviewed release, use `@illli-studio/dsh-mory@0.1.2` as the install spec.
+
+Tested harness release (`dshTarget`): `0.2.1-rc.5`. Supported DSH range:
+`>=0.2.1-rc.5 <0.3.0`; Node.js 22.18+ is required. Earlier DSH releases are
+outside the declared support range and are blocked by the package's compatibility
+requirement; their runtime behavior has not been tested. No additional MCP
+connection is needed. The browser-only online
+repository is not automatically connected; settings and memory access use the
+Mory service on the DSH host.
 
 For background operation, moving data, web deployment, or contributing code,
 see the [setup guide](docs/GETTING_STARTED.md).
