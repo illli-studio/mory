@@ -56,6 +56,31 @@ Source snapshots remain unmodified. The generated CSS is embedded as a string,
 and the original SVG is embedded as a percent-encoded data URL. The distribution
 icon is also refreshed from that same SVG.
 
+## Marketplace raster icon
+
+`assets/market-icon.png` is a 512×512 PNG storefront tile for directories that
+accept only GitHub-hosted raster images. It retains the original SVG's colors,
+rounded paper layers, and two-line ME.MORY lockup. The native DSH icon export
+continues to use `icon.svg`.
+
+The optional authoring helper `scripts/build-market-icon.py` reads the original
+SVG geometry and uses Pillow to rasterize it at four times the output size
+before downsampling. Its text uses a local Cooper Black font when available,
+otherwise Georgia Bold (used for the committed PNG); it does not distribute or
+download fonts. Pass `--font` to select another locally licensed bold serif font.
+This helper is separate from the Node-only runtime build:
+
+```sh
+python scripts/build-market-icon.py
+```
+
+The PNG follows the same project license as the original artwork. Its public
+marketplace URL is:
+
+```text
+https://raw.githubusercontent.com/illli-studio/mory/main/packages/dsh-mory/assets/market-icon.png
+```
+
 Run `npm run build`, `npm test`, and `npm pack --dry-run` before publishing. To
 check the snapshot fallback, extract the npm archive outside this repository and
 run `npm run build` and `npm pack --dry-run` there. The build must report
